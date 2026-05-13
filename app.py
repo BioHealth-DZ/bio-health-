@@ -21,19 +21,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 🔑 تنبيه: يجب وضع مفتاح جديد تماماً هنا ---
+# --- 🔑 ضع مفتاحك الجديد هنا (تأكد أنه جديد وغير محظور) ---
 API_KEY = "AIzaSyBKvFfji6lkjNNYxraI9OS0pZK5_bIt-Ew"
-# ----------------------------------------------
+# -------------------------------------------------------
 
 def get_ai_response(prompt):
     if "الجـديد" in API_KEY or not API_KEY:
-        return "⚠️ تنبيه: مفتاحك القديم معطل. يرجى إصدار مفتاح جديد من Google AI Studio ووضعه في السطر 25."
+        return "⚠️ يرجى وضع مفتاح API الجديد في الكود."
     try:
         genai.configure(api_key=API_KEY.strip())
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        return model.generate_content(prompt).text
+        
+        # محاولة ذكية لتجربة الموديلات المتاحة لتجنب خطأ 404
+        try:
+            model = genai.GenerativeModel('gemini-pro') # جرب البرو أولاً لأنه الأكثر استقراراً في المكتبات القديمة
+        except:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        return f"❌ خطأ فني: {str(e)}. يرجى مراجعة مفتاح API الخاص بك."
+        return f"❌ عذراً، هناك مشكلة في الاتصال. تأكد من المفتاح. (الخطأ: {str(e)})"
 
 # واجهة المستخدم
 st.markdown('<p class="main-title">🧪 منصة البيوكيمياء والصحة الجزائرية</p>', unsafe_allow_html=True)
@@ -54,34 +61,27 @@ if menu == "📊 حاسبة الصحة والوزن":
     if st.button("إجراء التحليل البيوكيميائي"):
         bmi = weight / ((height/100)**2)
         
-        # تحليل النتيجة وشرحها
+        # تحديد لون وحالة النتيجة
         if bmi < 18.5:
-            meaning = "نقص في الوزن: جسمك يحتاج لتغذية مكثفة وغنية بالبروتينات."
-            color = "#fbc02d"
+            meaning, color = "نقص في الوزن: جسمك يحتاج لتغذية أكثر.", "#fbc02d"
         elif 18.5 <= bmi < 25:
-            meaning = "وزن مثالي: أنت في النطاق الصحي، حافظ على هذا التوازن."
-            color = "#2e7d32"
+            meaning, color = "وزن مثالي: تبارك الله، أنت في النطاق الصحي تماماً.", "#2e7d32"
         elif 25 <= bmi < 30:
-            meaning = "زيادة في الوزن: بداية الخروج عن النطاق الصحي، ينصح بممارسة الرياضة."
-            color = "#ef6c00"
+            meaning, color = "زيادة في الوزن: انتبه، بدأت تدخل في نطاق الوزن الزائد.", "#ef6c00"
         else:
-            meaning = "سمنة: قد تؤثر على وظائفك الحيوية، ينصح باستشارة مختص."
-            color = "#c62828"
+            meaning, color = "سمنة: وزنك قد يرهق قلبك ومفاصلك، ينصح بنظام غذائي.", "#c62828"
 
         st.markdown(f"""
         <div class="result-card">
             <h3 style="color:{color};">كتلة الجسم (BMI): {bmi:.1f}</h3>
             <div class="info-box">
-                <b>ماذا تعني هذه النتيجة؟</b><br>
-                {meaning}
+                <b>💡 ماذا تعني هذه النتيجة؟</b><br>
+                هذا الرقم يخبرنا بمدى تناسق وزنك مع طولك. حالتك حالياً: <b>{meaning}</b>
             </div>
-            <p style="font-size: 0.9rem; margin-top: 10px; color: #555;">
-            * مؤشر كتلة الجسم هو مقياس عالمي يربط بين الوزن والطول لتحديد كمية الدهون التقريبية في الجسم.
-            </p>
         </div>
         """, unsafe_allow_html=True)
         
-        with st.spinner("جاري جلب نصائح الخبير..."):
+        with st.spinner("جاري تحليل بياناتك..."):
             res = get_ai_response(f"أنا {gender} عمري {age} وحالتي {status} بكتلة جسم {bmi:.1f}. انصحني بالجزائرية.")
             st.info(res)
 
