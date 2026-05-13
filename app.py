@@ -1,54 +1,113 @@
 import streamlit as st
 import google.generativeai as genai
 
-# إعدادات الصفحة
-st.set_page_config(page_title="دليلك الصحي الجزائري", page_icon="🧪")
+# إعدادات الصفحة والتصميم
+st.set_page_config(page_title="منصة البيوكيمياء والصحة", page_icon="🧪", layout="wide")
+
+# تصميم CSS لجعل الواجهة احترافية
+st.markdown("""
+    <style>
+    .main {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 20px;
+        background-color: #2e7d32;
+        color: white;
+        height: 3em;
+        font-weight: bold;
+    }
+    .result-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- ضع مفتاحك هنا ---
 API_KEY = "AIzaSyD9WBNpqzGhS47RfFrw0YqPb40TbB8dX9M" 
 # -----------------------
 
-if API_KEY != "ضـع_كـود_AIza_الخـاص_بـك_هنـا":
+# إعداد الذكاء الاصطناعي
+try:
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except:
+    st.error("تأكد من وضع مفتاح API Key بشكل صحيح في الكود.")
 
 st.title("🧪 منصة البيوكيمياء والصحة الجزائرية")
-st.markdown("---")
+st.write("دليلك العلمي للصحة والغذاء بلمسة جزائرية ذكية")
 
-menu = st.sidebar.selectbox("اختر الخدمة", ["حاسبة الوزن والماكروز", "تحليل المكونات (ذكاء اصطناعي)", "كيمياء الأكل الجزائري"])
+menu = st.sidebar.selectbox("القائمة الرئيسية", 
+    ["📊 حاسبة الصحة والوزن", "🔬 المحلل البيوكيميائي الذكي", "🥘 كيمياء المطبخ الجزائري"])
 
-if menu == "حاسبة الوزن والماكروز":
-    st.header("📊 حساب الوزن المثالي والاحتياج الغذائي")
-    col1, col2 = st.columns(2)
-    with col1:
-        weight = st.number_input("الوزن (كغ)", min_value=40, max_value=200, value=70)
-        height = st.number_input("الطول (سم)", min_value=120, max_value=220, value=170)
-    with col2:
-        age = st.number_input("العمر", min_value=15, max_value=100, value=25)
-        gender = st.radio("الجنس", ["ذكر", "أنثى"])
+if menu == "📊 حاسبة الصحة والوزن":
+    st.header("⚖️ تقييم الحالة الجسدية")
+    
+    with st.container():
+        col1, col2 = st.columns(2)
+        with col1:
+            weight = st.number_input("الوزن (كغ)", 30, 200, 70)
+            height = st.number_input("الطول (سم)", 100, 250, 170)
+        with col2:
+            age = st.number_input("العمر", 10, 100, 25)
+            health_status = st.selectbox("الحالة الصحية (اختياري)", 
+                ["طبيعي", "سكري", "ضغط دم مرتفع", "حامل", "مرضع"])
 
-    if st.button("احسب النتائج"):
+    if st.button("تحليل حالتي"):
         bmi = weight / ((height/100)**2)
-        st.subheader(f"مؤشر كتلة الجسم: {bmi:.2f}")
-        calories = weight * 24 * 1.2
-        st.info(f"احتياجك اليومي: {calories:.0f} سعرة")
-
-elif menu == "تحليل المكونات (ذكاء اصطناعي)":
-    st.header("🔬 المحلل البيوكيميائي الذكي")
-    user_input = st.text_input("اسأل عن تأثير أي مادة كيميائية أو دواء:")
-    if st.button("حلل الآن"):
-        if "AIza" not in API_KEY:
-            st.error("لم تضع مفتاح الـ API بشكل صحيح!")
+        status = ""
+        tips = ""
+        
+        if bmi < 18.5:
+            status = "نقص في الوزن"
+            tips = "تحتاج لأطعمة غنية بالطاقة مثل: الروينة، التمر، زيت الزيتون، والمكسرات."
+        elif 18.5 <= bmi < 25:
+            status = "وزن مثالي"
+            tips = "حافظ على نظامك الغذائي مع شرب الكثير من الماء."
         else:
-            with st.spinner("جاري التحليل..."):
-                prompt = f"أنت خبير بيوكيمياء. اشرح بلهجة جزائرية بسيطة التأثير العلمي لـ {user_input}"
-                response = model.generate_content(prompt)
-                st.success("النتيجة العلمية:")
-                st.write(response.text)
+            status = "زيادة في الوزن"
+            tips = "قلل من الخبز الأبيض والسكريات، وركز على الشربة والسلطات الجزائرية الغنية بالألياف."
 
-elif menu == "كيمياء الأكل الجزائري":
-    st.header("🥘 تحليل المطبخ الجزائري")
-    st.write("هذا القسم سيخبرك بمكونات أطباقنا كيميائياً قريباً!")
+        st.markdown(f"""
+        <div class="result-card">
+            <h3>نتيجتك: {bmi:.1f} - {status}</h3>
+            <p>💡 <b>نصيحة سريعة:</b> {tips}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-st.markdown("---")
-st.caption("تم التطوير بمساعدة الذكاء الاصطناعي - متخصص بيوكيمياء جزائري 🇩🇿")
+        if health_status != "طبيعي":
+            with st.spinner("جاري جلب نصيحة طبية مخصصة..."):
+                prompt = f"أنا شخص عمري {age} ووزني {weight} وطولي {height} وحالتي {health_status}. قدم لي نصيحة غذائية بيوكيمائية قصيرة جداً بلهجة جزائرية."
+                res = model.generate_content(prompt)
+                st.warning(f"🔔 نصيحة خاصة لـ {health_status}:")
+                st.write(res.text)
+
+elif menu == "🔬 المحلل البيوكيميائي الذكي":
+    st.header("🔍 استشارة ذكية فورية")
+    query = st.text_area("عن ماذا تبحث؟ (مثلاً: تأثير شرب الشاي بعد الأكل مباشرة كيميائياً)")
+    
+    if st.button("تحليل المادة"):
+        with st.spinner("الذكاء الاصطناعي يحلل الآن..."):
+            prompt = f"اشرح لي بلهجة جزائرية وبأسلوب علمي مبسط جداً: {query}"
+            res = model.generate_content(prompt)
+            st.success("التحليل الكيميائي الحيوي:")
+            st.write(res.text)
+
+elif menu == "🥘 كيمياء المطبخ الجزائري":
+    st.header("🍽️ ماذا يوجد في طبقك؟")
+    dish = st.text_input("اكتب اسم الطبق الجزائري (مثال: طعام، شربة فريك، محاجب)")
+    
+    if st.button("تحليل الطبق"):
+        with st.spinner("تحليل المكونات..."):
+            prompt = f"حلل طبق {dish} من ناحية السعرات، الفوائد، وتأثيره الكيميائي على الجسم. تحدث بلهجة جزائرية."
+            res = model.generate_content(prompt)
+            st.info(f"تقرير عن {dish}:")
+            st.write(res.text)
+
+st.sidebar.markdown("---")
+st.sidebar.info("💡 نصيحة اليوم: استبدل السكر الأبيض بالتمر الجزائري لتحسين تفاعلات الأنسولين في جسمك!")
