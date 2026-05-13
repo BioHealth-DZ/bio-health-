@@ -5,7 +5,7 @@ import google.generativeai as genai
 st.set_page_config(page_title="دليلك الصحي الجزائري", page_icon="🧪")
 
 # --- ضع مفتاحك هنا ---
-API_KEY = "ضـع_كـود_AIza_الخـاص_بـك_هنـا" 
+API_KEY = "AIzaSyD9WBNpqzGhS47RfFrw0YqPb40TbB8dX9M" 
 # -----------------------
 
 if API_KEY != "ضـع_كـود_AIza_الخـاص_بـك_هنـا":
