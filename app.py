@@ -1,98 +1,137 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. إعدادات الصفحة والتصميم الفاخر (إعادة كل الميزات البصرية)
-st.set_page_config(page_title="منصة البيوكيمياء والصحة الجزائرية", page_icon="🧪", layout="wide")
+# 1. إعدادات الصفحة الأساسية
+st.set_page_config(page_title="BioHealth DZ", page_icon="🧪", layout="wide")
 
+# 2. تحسين الرؤية (خلفية واضحة جداً ونصوص حادة)
 st.markdown("""
     <style>
     .stApp {
-        background: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), 
-                    url('https://images.unsplash.com/photo-1576086213369-97a306d36557?q=80&w=2000');
-        background-size: cover;
+        background-color: #f4f7f6; /* خلفية رمادية هادئة جداً تريح العين */
     }
-    .main-title { color: #1b5e20; text-align: center; font-size: 2.8rem; font-weight: bold; margin-bottom: 20px; }
+    .main-title { 
+        color: #1b5e20; text-align: center; font-size: 2.8rem; font-weight: bold; 
+        padding: 20px; margin-bottom: 20px;
+    }
+    .welcome-card {
+        background-color: white; padding: 40px; border-radius: 20px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e0e0e0;
+        max-width: 700px; margin: auto;
+    }
     .result-card {
         background-color: white; padding: 25px; border-radius: 15px;
-        border-right: 10px solid #2e7d32; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        margin-top: 20px;
+        border-left: 10px solid #2e7d32; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        color: #212529; font-size: 1.1rem;
     }
-    .info-box { background-color: #e8f5e9; border-radius: 10px; padding: 15px; margin-top: 15px; border: 1px solid #2e7d32; }
-    .stButton>button { background: #2e7d32; color: white; border-radius: 25px; width: 100%; font-weight: bold; height: 3em; }
+    /* جعل النصوص في الخانات غامقة وواضحة */
+    .stNumberInput label, .stTextInput label, .stSelectbox label {
+        color: #1b5e20 !important; font-weight: bold !important; font-size: 1.1rem !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. جلب المفتاح من Secrets (الخزانة السرية)
-API_KEY = st.secrets.get("GEMINI_API_KEY")
+# 3. نظام اللغات (Translations)
+translations = {
+    "العربية": {
+        "welcome": "مرحباً بك في منصة البيوكيمياء والصحة",
+        "enter_info": "يرجى إدخال بياناتك للدخول",
+        "name": "الاسم الكامل", "email": "البريد الإلكتروني", "start": "دخول للمنصة",
+        "bmi_tab": "📊 حاسبة كتلة الجسم", "food_tab": "🥘 تحليل الأطباق", "lab_tab": "🔬 المختبر العلمي",
+        "weight": "الوزن (كغ)", "height": "الطول (سم)", "analyze": "تحليل الآن",
+        "food_prompt": "قم بتحليل طبق {} بيوكيمياياً. اذكر الإيجابيات والسلبيات الصحية بكل حياد ونقد علمي (نصف بنصف) دون مبالغة في المديح، باللغة العربية الدارجة الجزائرية.",
+        "lang_label": "اختر اللغة"
+    },
+    "Français": {
+        "welcome": "Bienvenue sur BioHealth DZ",
+        "enter_info": "Veuillez entrer vos informations",
+        "name": "Nom Complet", "email": "E-mail", "start": "Entrer",
+        "bmi_tab": "📊 Calcul de l'IMC", "food_tab": "🥘 Nutrition", "lab_tab": "🔬 Labo Scientifique",
+        "weight": "Poids (kg)", "height": "Taille (cm)", "analyze": "Analyser",
+        "food_prompt": "Analysez le plat {} de manière biochimique. Citez les points positifs et négatifs avec neutralité scientifique (50/50) en français.",
+        "lang_label": "Langue"
+    },
+    "English": {
+        "welcome": "Welcome to BioHealth DZ",
+        "enter_info": "Please enter your details to proceed",
+        "name": "Full Name", "email": "Email Address", "start": "Enter Platform",
+        "bmi_tab": "📊 BMI Calculator", "food_tab": "🥘 Food Analysis", "lab_tab": "🔬 Science Lab",
+        "weight": "Weight (kg)", "height": "Height (cm)", "analyze": "Analyze Now",
+        "food_prompt": "Analyze the dish {} biochemically. Mention health pros and cons with scientific neutrality (50/50) in English.",
+        "lang_label": "Language"
+    }
+}
 
-def get_ai_response(prompt):
-    if not API_KEY:
-        return "⚠️ يرجى التأكد من وضع GEMINI_API_KEY في إعدادات Secrets."
-    try:
-        genai.configure(api_key=API_KEY)
+# 4. منطق الدخول والترحيب (Session State)
+if 'auth' not in st.session_state:
+    st.session_state.auth = False
+
+if not st.session_state.auth:
+    st.markdown('<br><br>', unsafe_allow_html=True)
+    with st.container():
+        st.markdown('<div class="welcome-card">', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#1b5e20;">🧪 BioHealth DZ</h1>', unsafe_allow_html=True)
         
-        # حل مشكلة 404: البحث عن الموديل المتاح في حسابك آلياً
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        if not available_models:
-            return "❌ لم يتم العثور على موديل متاح."
+        sel_lang = st.selectbox("اختر اللغة / Langue / Language", ["العربية", "Français", "English"])
+        T = translations[sel_lang]
         
-        # نختار 'gemini-pro' إذا وجد، وإلا نختار أول موديل متاح
-        selected_model = 'models/gemini-pro' if 'models/gemini-pro' in available_models else available_models[0]
+        st.subheader(T["welcome"])
+        u_name = st.text_input(T["name"])
+        u_email = st.text_input(T["email"])
         
-        model = genai.GenerativeModel(selected_model)
-        return model.generate_content(prompt).text
-    except Exception as e:
-        return f"❌ خطأ فني: {str(e)}"
+        if st.button(T["start"]):
+            if u_name:
+                st.session_state.auth = True
+                st.session_state.user = u_name
+                st.session_state.lang = sel_lang
+                st.rerun()
+            else:
+                st.error("يرجى إدخال الاسم على الأقل!")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# 3. واجهة المستخدم الرئيسية
-st.markdown('<p class="main-title">🧪 منصة البيوكيمياء والصحة الجزائرية</p>', unsafe_allow_html=True)
-
-menu = st.sidebar.selectbox("القائمة الرئيسية", ["📊 حاسبة الصحة والوزن", "🔬 المحلل البيوكيميائي", "🥘 كيمياء المطبخ"])
-
-if menu == "📊 حاسبة الصحة والوزن":
-    st.header("⚖️ تقييم الحالة الجسدية")
-    col1, col2 = st.columns(2)
-    with col1:
-        weight = st.number_input("الوزن (كغ)", 30, 200, 75)
-        height = st.number_input("الطول (سم)", 100, 250, 170)
-        age = st.number_input("العمر", 5, 100, 25)
-    with col2:
-        gender = st.radio("الجنس", ["ذكر", "أنثى"])
-        status = st.selectbox("الحالة الصحية", ["طبيعي", "سكري", "ضغط دم", "حامل", "مرضعة"])
+else:
+    # القائمة الرئيسية بعد الدخول
+    T = translations[st.session_state.lang]
+    st.sidebar.title(f"👤 {st.session_state.user}")
     
-    if st.button("إجراء التحليل البيوكيميائي"):
-        bmi = weight / ((height/100)**2)
-        
-        # تحديد لون وحالة النتيجة
-        if bmi < 18.5: meaning, color = "نقص في الوزن: جسمك يحتاج لزيادة المغذيات الأساسية.", "#fbc02d"
-        elif 18.5 <= bmi < 25: meaning, color = "وزن مثالي: تبارك الله، أنت في النطاق الصحي.", "#2e7d32"
-        elif 25 <= bmi < 30: meaning, color = "زيادة في الوزن: بداية خروج عن التوازن البيوكيميائي.", "#ef6c00"
-        else: meaning, color = "سمنة: قد تؤثر على الوظائف الحيوية، ينصح بالمتابعة.", "#c62828"
+    # جلب المفتاح والتعامل مع الموديل
+    API_KEY = st.secrets.get("GEMINI_API_KEY")
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
-        st.markdown(f"""
-        <div class="result-card">
-            <h3 style="color:{color};">مؤشر كتلة الجسم (BMI): {bmi:.1f}</h3>
-            <div class="info-box">
-                <b>💡 ماذا تعني هذه النتيجة؟</b><br>
-                {meaning}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        with st.spinner("جاري جلب نصيحة الخبير الذكي..."):
-            res = get_ai_response(f"أنا {gender} عمري {age} وحالتي {status} بكتلة جسم {bmi:.1f}. انصحني بالجزائرية نصيحة صحية.")
-            st.info(res)
+    menu = st.sidebar.radio("Navigate", [T["bmi_tab"], T["food_tab"], T["lab_tab"]])
 
-elif menu == "🔬 المحلل البيوكيميائي":
-    st.header("🔬 المختبر الافتراضي")
-    query = st.text_area("اطرح سؤالك العلمي (مثلاً: تأثير السكر على الدم):")
-    if st.button("تحليل الآن"):
-        with st.spinner("جاري التحليل..."):
-            st.write(get_ai_response(f"اشرح لي بالجزائرية وببساطة: {query}"))
+    st.markdown(f'<h1 class="main-title">{T["welcome"]}</h1>', unsafe_allow_html=True)
 
-elif menu == "🥘 كيمياء المطبخ":
-    st.header("🥘 التحليل الغذائي للأطباق")
-    dish = st.text_input("اسم الطبق الجزائري (مثلاً: كسكس، محاجب):")
-    if st.button("كشف الأسرار"):
-        with st.spinner("جاري فحص المكونات..."):
-            st.write(get_ai_response(f"حلل طبق {dish} كيميائياً وغذائياً بالجزائرية"))
+    if menu == T["bmi_tab"]:
+        with st.container():
+            st.markdown('<div class="result-card">', unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            with c1: w = st.number_input(T["weight"], 30.0, 200.0, 75.0)
+            with c2: h = st.number_input(T["height"], 100.0, 250.0, 170.0)
+            
+            if st.button(T["analyze"]):
+                bmi = w / ((h/100)**2)
+                st.write(f"### BMI: {bmi:.1f}")
+                with st.spinner("..."):
+                    advice_prompt = f"Give medical advice for BMI {bmi:.1f} in {st.session_state.lang}"
+                    st.info(model.generate_content(advice_prompt).text)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    elif menu == T["food_tab"]:
+        dish = st.text_input("Dish Name / اسم الطبق")
+        if st.button(T["analyze"]):
+            with st.spinner("Analyzing..."):
+                response = model.generate_content(T["food_prompt"].format(dish))
+                st.markdown(f'<div class="result-card">{response.text}</div>', unsafe_allow_html=True)
+
+    elif menu == T["lab_tab"]:
+        query = st.text_area("Ask Science / سؤال علمي")
+        if st.button(T["analyze"]):
+            with st.spinner("..."):
+                response = model.generate_content(f"Explain this in {st.session_state.lang}: {query}")
+                st.write(response.text)
+
+    if st.sidebar.button("Logout / خروج"):
+        st.session_state.auth = False
+        st.rerun()
