@@ -1,6 +1,5 @@
 import streamlit as st
-import requests
-import json
+import google.generativeai as genai
 import random
 
 # 1. إعداد الصفحة
@@ -41,38 +40,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي - استخدام الموديل المستقر v1/gemini-pro
+# 3. دالة الذكاء الاصطناعي باستخدام المكتبة الرسمية (الأكثر استقراراً)
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
-        return "⚠️ Error: API Key not found in Streamlit Secrets."
-    
-    api_key = st.secrets["GEMINI_API_KEY"]
-    
-    # محاولة استخدام الموديل المستقر gemini-pro عبر النسخة v1
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
-    
-    headers = {'Content-Type': 'application/json'}
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+        return "⚠️ مفتاح API غير موجود في إعدادات Secrets."
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            # إذا فشل، نحاول المحاولة الأخيرة بموديل gemini-1.5-flash بدون كلمة latest
-            backup_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-            response = requests.post(backup_url, json=payload, headers=headers, timeout=15)
-            if response.status_code == 200:
-                return response.json()['candidates'][0]['content']['parts'][0]['text']
-            
-            error_details = response.json().get('error', {}).get('message', response.text)
-            return f"❌ خطأ في السيرفر ({response.status_code}): {error_details}"
+        # إعداد المكتبة بالمفتاح
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        # استخدام موديل gemini-pro المستقر
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        return f"⚠️ فشل الاتصال: {str(e)}"
+        # محاولة أخيرة بموديل flash إذا فشل pro
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt)
+            return response.text
+        except:
+            return f"❌ خطأ في الاتصال: {str(e)}"
 
 # 4. بيانات اللغات (نفس الترتيب والمحتوى السابق)
 strings = {
