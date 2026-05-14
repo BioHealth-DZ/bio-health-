@@ -1,13 +1,12 @@
 import streamlit as st
-import requests
-import json
+import google.generativeai as genai
 import random
 import time
 
 # 1. إعداد الصفحة
 st.set_page_config(page_title="BioHealth DZ", page_icon="💊", layout="wide")
 
-# 2. التنسيق الجمالي (CSS)
+# 2. التنسيق الجمالي (CSS) - تصميمك الأصلي
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -42,45 +41,31 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي - حل نهائي لمشكلة 404 و 429
-def get_ai_response(prompt):
-    if "GEMINI_API_KEY" not in st.secrets:
-        return "⚠️ Error: API Key not found."
-    
-    api_key = st.secrets["GEMINI_API_KEY"]
-    full_prompt = f"أجب باللغة العربية فقط وبشكل مفصل: {prompt}"
-    
-    # محاولة استخدام الرابط بصيغ مختلفة لحل مشكلة 404
-    # الصيغة الأولى هي الأكثر استقراراً حالياً
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    
-    headers = {'Content-Type': 'application/json'}
-    payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
-    
-    for attempt in range(3):
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=60)
-            
-            if response.status_code == 200:
-                return response.json()['candidates'][0]['content']['parts'][0]['text']
-            
-            # إذا فشل الرابط الأول بـ 404، نجرب صيغة بديلة
-            elif response.status_code == 404 and attempt == 0:
-                url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
-                continue
-                
-            elif response.status_code == 429:
-                time.sleep(10) 
-                continue
-            else:
-                return f"⚠️ السيرفر استجاب بخطأ {response.status_code}. يرجى المحاولة لاحقاً."
-        except Exception:
-            time.sleep(2)
-            continue
-            
-    return "⚠️ تعذر الاتصال بالسيرفر، يرجى التأكد من اتصال الإنترنت أو صلاحية المفتاح."
+# 3. إعداد الذكاء الاصطناعي باستخدام المكتبة الرسمية
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+else:
+    st.error("⚠️ API Key مفقود في الإعدادات!")
 
-# 4. نصوص اللغات
+def get_ai_response(prompt):
+    try:
+        # استخدام موديل Flash الأسرع والمستقر
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        # إجبار اللغة العربية
+        full_prompt = f"أجب باللغة العربية فقط وبشكل مفصل: {prompt}"
+        
+        response = model.generate_content(full_prompt)
+        return response.text
+    except Exception as e:
+        error_msg = str(e)
+        if "429" in error_msg:
+            return "⚠️ ضغط عالي على السيرفر، يرجى المحاولة بعد دقيقة."
+        elif "404" in error_msg:
+            return "⚠️ الموديل غير متوفر حالياً، جاري إعادة المحاولة..."
+        else:
+            return f"⚠️ عذراً، حدث خطأ فني: {error_msg}"
+
+# 4. نصوص اللغات (العربية والإنجليزية)
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -100,7 +85,7 @@ strings = {
     }
 }
 
-# 5. منطق التحكم والصفحات
+# 5. منطق التحكم
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -141,7 +126,7 @@ else:
         if st.button(T["btn"]):
             bmi = weight / ((height/100)**2)
             st.markdown(f"### BMI: **{bmi:.1f}**")
-            with st.spinner("جاري التحليل..."):
+            with st.spinner("جاري تحليل الحالة..."):
                 res = get_ai_response(f"نصيحة صحية لـ {age} سنة، {gender}، كتلة جسم {bmi:.1f}، يعاني من {chronic}")
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
 
