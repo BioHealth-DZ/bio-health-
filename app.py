@@ -48,8 +48,8 @@ def get_ai_response(prompt):
     
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # التعديل الجوهري: استخدام v1 مع gemini-pro لحل مشكلة الـ 404 نهائياً
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
+    # هذا الرابط هو المسار الصحيح والمحدث لتجنب خطأ 404 في v1beta
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     headers = {'Content-Type': 'application/json'}
     payload = {
@@ -64,14 +64,14 @@ def get_ai_response(prompt):
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # عرض الرسالة القادمة من جوجل بدقة إذا حدث خطأ آخر
+            # قراءة رسالة الخطأ من السيرفر مباشرة لتحديد السبب بدقة
             try:
                 error_info = response.json().get('error', {}).get('message', 'Unknown Error')
             except:
                 error_info = response.text
             return f"❌ خطأ ({response.status_code}): {error_info}"
     except Exception as e:
-        return f"⚠️ فشل في الاتصال: {str(e)}"
+        return f"⚠️ فشل في الاتصال بالسيرفر: {str(e)}"
     api_key = st.secrets["GEMINI_API_KEY"]
     # استخدام الإصدار المستقر v1 لضمان أعلى توافق وتجنب خطأ 404
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
