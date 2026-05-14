@@ -43,40 +43,35 @@ st.markdown("""
 
 # 3. دالة الذكاء الاصطناعي (تجاوز خطأ الاتصال في الصورة)
 def get_ai_response(prompt):
-    # 1. التحقق من وجود المفتاح في الإعدادات
     if "GEMINI_API_KEY" not in st.secrets:
-        return "⚠️ خطأ: مفتاح API غير معرف في إعدادات Secrets."
+        return "⚠️ مفتاح API غير موجود في إعدادات Secrets."
     
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # 2. الرابط الصحيح والمؤكد (v1beta)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # التعديل الجوهري: استخدام v1 مع gemini-pro لحل مشكلة الـ 404 نهائياً
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
     
-    # 3. إعداد بيانات الطلب بشكل دقيق جداً
     headers = {'Content-Type': 'application/json'}
     payload = {
-        "contents": [
-            {
-                "parts": [{"text": prompt}]
-            }
-        ]
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
     }
     
     try:
-        # 4. تنفيذ الطلب مع وقت انتظار كافٍ
         response = requests.post(url, json=payload, headers=headers, timeout=15)
         
-        # 5. معالجة الرد
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # في حال استمر الخطأ، هذا النص سيخبرنا بالسبب الحقيقي (صلاحية المفتاح أو الرابط)
-            error_data = response.json()
-            error_msg = error_data.get('error', {}).get('message', 'خطأ غير معروف')
-            return f"❌ خطأ ({response.status_code}): {error_msg}"
-            
+            # عرض الرسالة القادمة من جوجل بدقة إذا حدث خطأ آخر
+            try:
+                error_info = response.json().get('error', {}).get('message', 'Unknown Error')
+            except:
+                error_info = response.text
+            return f"❌ خطأ ({response.status_code}): {error_info}"
     except Exception as e:
-        return f"⚠️ فشل الاتصال بالسيرفر: {str(e)}"
+        return f"⚠️ فشل في الاتصال: {str(e)}"
     api_key = st.secrets["GEMINI_API_KEY"]
     # استخدام الإصدار المستقر v1 لضمان أعلى توافق وتجنب خطأ 404
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
