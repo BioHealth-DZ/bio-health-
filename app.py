@@ -1,15 +1,4 @@
-# الكود الصحيح لإخفاء العناصر
-hide_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    /* إخفاء زر المطورين وزر Fork */
-    .stAppDeployButton {display:none;}
-    [data-testid="stHeader"] {display:none;}
-    </style>
-    """
-st.markdown('<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;} .stAppDeployButton {display:none;} [data-testid="stHeader"] {display:none;}</style>', unsafe_allow_html=True)
+
 import streamlit as st
 import google.generativeai as genai
 
