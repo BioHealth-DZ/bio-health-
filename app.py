@@ -54,7 +54,7 @@ def get_ai_response(prompt):
     base_url = "https://generativelanguage.googleapis.com/v1beta"
     
     try:
-        # البحث عن الموديل المتاح
+        # البحث التلقائي عن الموديل المتاح
         models_resp = requests.get(f"{base_url}/models?key={api_key}", timeout=10)
         available_models = models_resp.json().get('models', [])
         target_model = next((m['name'] for m in available_models if "generateContent" in m.get('supportedGenerationMethods', [])), "models/gemini-1.5-flash")
@@ -68,7 +68,7 @@ def get_ai_response(prompt):
             if response.status_code == 200:
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             elif response.status_code == 429:
-                time.sleep(5) # الانتظار 5 ثواني في حال الضغط
+                time.sleep(10) # الانتظار 10 ثواني في حال الضغط وإعادة المحاولة
                 continue
             else:
                 break
@@ -78,7 +78,7 @@ def get_ai_response(prompt):
     except Exception as e:
         return f"⚠️ عطل فني: {str(e)}"
 
-# 4. بيانات اللغات (كما هي)
+# 4. بيانات اللغات
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -98,7 +98,7 @@ strings = {
     }
 }
 
-# 5. منطق البرنامج (كما هو)
+# 5. منطق الدخول واختيار اللغة
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
