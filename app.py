@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import json
 import random
 
 # 1. إعداد الصفحة
@@ -40,28 +41,40 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي باستخدام المكتبة الرسمية (الأكثر استقراراً)
+# 3. دالة الذكاء الاصطناعي - الحل الذي سيكسر الحلقة
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
-        return "⚠️ مفتاح API غير موجود في إعدادات Secrets."
+        return "⚠️ Error: API Key not found in Streamlit Secrets."
+    
+    api_key = st.secrets["GEMINI_API_KEY"]
+    
+    # الرابط الوحيد الذي يعمل حالياً مع موديل Flash في نسخة v1beta
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
     
     try:
-        # إعداد المكتبة بالمفتاح
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        # استخدام موديل gemini-pro المستقر
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        # محاولة أخيرة بموديل flash إذا فشل pro
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
-            return response.text
-        except:
-            return f"❌ خطأ في الاتصال: {str(e)}"
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        
+        # إذا كان الخطأ 404، سنجرب الموديل البديل فوراً في نفس اللحظة
+        if response.status_code == 404:
+            alt_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+            response = requests.post(alt_url, json=payload, headers=headers, timeout=15)
 
-# 4. بيانات اللغات (نفس الترتيب والمحتوى السابق)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            err = response.json().get('error', {}).get('message', 'Unknown error')
+            return f"❌ تعذر الاتصال بالموديل: {err}"
+    except Exception as e:
+        return f"⚠️ خطأ فني: {str(e)}"
+
+# 4. بيانات اللغات (كما هي بدون تغيير)
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -81,7 +94,7 @@ strings = {
     }
 }
 
-# 5. منطق الدخول واختيار اللغة (ثابت كما هو)
+# 5. منطق البرنامج (ثابت كما هو)
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -134,7 +147,7 @@ else:
         food_query = st.text_input("إسم الطبق (مثلاً: كسكسي، شربة)")
         if st.button("تحليل المكونات 🥗"):
             with st.spinner("جاري التحليل..."):
-                res = get_ai_response(f"ما هي المكونات والقيمة الغذائية لطبق: {food_query}")
+                res = get_ai_response(f"ما هي مكونات طبق {food_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "lab":
