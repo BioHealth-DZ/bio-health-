@@ -43,32 +43,40 @@ st.markdown("""
 
 # 3. دالة الذكاء الاصطناعي (تجاوز خطأ الاتصال في الصورة)
 def get_ai_response(prompt):
+    # 1. التحقق من وجود المفتاح في الإعدادات
     if "GEMINI_API_KEY" not in st.secrets:
-        return "⚠️ مفتاح API غير موجود في إعدادات Secrets."
+        return "⚠️ خطأ: مفتاح API غير معرف في إعدادات Secrets."
     
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # هذا الرابط هو الوحيد الذي يتوافق مع الإصدار الحالي ويتجاوز خطأ 404
+    # 2. الرابط الصحيح والمؤكد (v1beta)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
+    # 3. إعداد بيانات الطلب بشكل دقيق جداً
     headers = {'Content-Type': 'application/json'}
     payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
+        "contents": [
+            {
+                "parts": [{"text": prompt}]
+            }
+        ]
     }
     
     try:
+        # 4. تنفيذ الطلب مع وقت انتظار كافٍ
         response = requests.post(url, json=payload, headers=headers, timeout=15)
         
+        # 5. معالجة الرد
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # إعادة رسالة الخطأ الخام لفهم ما يحدث في السيرفر
-            error_msg = response.json().get('error', {}).get('message', 'Unknown Error')
-            return f"❌ خطأ من السيرفر ({response.status_code}): {error_msg}"
+            # في حال استمر الخطأ، هذا النص سيخبرنا بالسبب الحقيقي (صلاحية المفتاح أو الرابط)
+            error_data = response.json()
+            error_msg = error_data.get('error', {}).get('message', 'خطأ غير معروف')
+            return f"❌ خطأ ({response.status_code}): {error_msg}"
+            
     except Exception as e:
-        return f"⚠️ فشل الاتصال بالشبكة: {str(e)}"
+        return f"⚠️ فشل الاتصال بالسيرفر: {str(e)}"
     api_key = st.secrets["GEMINI_API_KEY"]
     # استخدام الإصدار المستقر v1 لضمان أعلى توافق وتجنب خطأ 404
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
