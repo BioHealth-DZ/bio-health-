@@ -1,4 +1,16 @@
 import streamlit as st
+
+# كود لإخفاء الشريط العلوي وزر Fork
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stAppDeployButton {display:none;}
+    </style>
+    """
+st.markdown(hide_style, unsafe_allow_value=True)
+import streamlit as st
 import google.generativeai as genai
 
 # 1. إعدادات الصفحة
