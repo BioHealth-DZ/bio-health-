@@ -1,121 +1,95 @@
 import streamlit as st
 import google.generativeai as genai
-import random
-import time
 
-# 1. إعداد الصفحة والتصميم
-st.set_page_config(page_title="BioHealth DZ", page_icon="💊", layout="wide")
+# 1. إعدادات الصفحة والتنسيق (CSS)
+st.set_page_config(page_title="BioHealth DZ", page_icon="🏥", layout="wide")
 
 st.markdown("""
     <style>
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stApp { background-color: #f4fbf7; }
+    .stApp { background-color: #f8f9fa; }
     .main-header {
-        background: linear-gradient(135deg, #1b5e20 0%, #43a047 100%);
-        color: white; padding: 30px; border-radius: 20px; text-align: center;
-        margin-bottom: 20px;
+        background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+        color: white; padding: 2rem; border-radius: 15px; text-align: center;
+        margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     .advice-box {
-        background-color: white; border-right: 10px solid #2e7d32;
-        padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    div.stButton > button {
-        width: 100%; border-radius: 12px; height: 50px; font-weight: bold;
-        background: linear-gradient(90deg, #1b5e20, #43a047); color: white;
+        background-color: white; padding: 20px; border-radius: 10px;
+        border-right: 5px solid #2e7d32; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. إعداد الموديل (تم اختيار gemini-1.5-flash لأنه الأفضل في الحصة المجانية)
+# 2. إعداد الاتصال بجوجل (تأكدي من وضع المفتاح في Secrets)
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+else:
+    st.error("⚠️ يرجى إضافة GEMINI_API_KEY في إعدادات Secrets")
 
 def get_ai_response(prompt):
     try:
-        # قمنا بتثبيت هذا الموديل لأنه يدعم حتى 15 طلب في الدقيقة و1500 طلب في اليوم غالباً
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # استخدام نسخة 'latest' لضمان التوافق مع v1beta وتجاوز خطأ 404
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
-        # إضافة تعليمات لتقليل حجم الرد (لتوفير الرصيد)
-        full_prompt = f"أجب باللغة العربية باختصار مفيد ودقة طبية: {prompt}"
-        
-        response = model.generate_content(full_prompt)
+        response = model.generate_content(
+            f"أجب باللغة العربية باختصار ودقة طبية: {prompt}",
+            generation_config=genai.types.GenerationConfig(temperature=0.7)
+        )
         return response.text
     except Exception as e:
-        error_msg = str(e)
-        if "429" in error_msg:
-            return "❌ انتهت الحصة المجانية المتاحة حالياً. يرجى المحاولة بعد قليل (السيرفر تحت ضغط المستخدمين)."
-        return f"⚠️ خطأ في الاتصال: {error_msg}"
+        err = str(e)
+        if "429" in err:
+            return "❌ عذراً، انتهت حصة الأسئلة المجانية لهذا اليوم (20 طلب). يرجى العودة غداً."
+        elif "404" in err:
+            return "⚠️ الموديل غير متوفر حالياً، جاري تحديث الاتصال..."
+        return f"⚠️ خطأ فني: {err}"
 
-# --- باقي الكود (بيانات اللغات والصفحات) كما هو تماماً دون تغيير ---
-strings = {
-    "العربية": {
-        "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
-        "menu_bmi": "📊 حاسبة الصحة", "menu_food": "🥘 تحليل الأطباق", "menu_lab": "🔬 الأسئلة المخبرية",
-        "age": "العمر", "male": "ذكر", "female": "أنثى", "w": "الوزن (كغ)", "h": "الطول (سم)",
-        "chronic": "الأمراض المزمنة", "sugar": "سكري", "press": "ضغط دم", "none": "لا يوجد",
-        "btn": "تحليل الحالة الذكي ✨", "res": "النتائج والتوصيات:",
-        "tips": ["🩺 شرب الماء بانتظام يحسن التركيز.", "🍏 الخضروات الورقية غنية بالحديد."]
-    },
-    "English": {
-        "welcome": "BioHealth DZ Smart System 🏥", "enter": "Login", "name": "Full Name",
-        "menu_bmi": "📊 Health Calc", "menu_food": "🥘 Food Analysis", "menu_lab": "🔬 Lab Questions",
-        "age": "Age", "male": "Male", "female": "Female", "w": "Weight (kg)", "h": "Height (cm)",
-        "chronic": "Chronic Diseases", "sugar": "Diabetes", "press": "BP", "none": "None",
-        "btn": "Analyze Now ✨", "res": "Results:",
-        "tips": ["🩺 Hydration is key to overall health.", "🍏 Fiber-rich foods aid digestion."]
-    }
-}
+# 3. نظام تسجيل الدخول البسيط
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 
-if 'logged' not in st.session_state: st.session_state.logged = False
-
-if not st.session_state.logged:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1.2, 1])
-    with c2:
-        st.markdown("<h2 style='text-align:center;'>🧪 BioHealth DZ</h2>", unsafe_allow_html=True)
-        sel_lang = st.selectbox("Language / اللغة", ["العربية", "English"])
-        u_name = st.text_input(strings[sel_lang]["name"])
-        if st.button(strings[sel_lang]["enter"]):
-            if u_name:
-                st.session_state.logged, st.session_state.lang, st.session_state.user = True, sel_lang, u_name
+if not st.session_state.logged_in:
+    st.markdown("<div class='main-header'><h1>BioHealth DZ 🏥</h1><p>مرحباً بك في نظام التحليل الصحي</p></div>", unsafe_allow_html=True)
+    with st.container():
+        name = st.text_input("الاسم الكامل")
+        if st.button("دخول النظام"):
+            if name:
+                st.session_state.logged_in = True
+                st.session_state.user_name = name
                 st.rerun()
 else:
-    T = strings[st.session_state.lang]
-    st.markdown(f'<div class="main-header"><h1>{T["welcome"]}</h1><p>مرحباً، {st.session_state.user} 👋</p></div>', unsafe_allow_html=True)
+    # 4. الواجهة الرئيسية بعد الدخول
+    st.markdown(f"<div class='main-header'><h1>BioHealth DZ</h1><p>مرحباً دكتور(ة) {st.session_state.user_name}</p></div>", unsafe_allow_html=True)
     
-    nav1, nav2, nav3 = st.columns(3)
-    if 'page' not in st.session_state: st.session_state.page = "bmi"
-    if nav1.button(T["menu_bmi"]): st.session_state.page = "bmi"
-    if nav2.button(T["menu_food"]): st.session_state.page = "food"
-    if nav3.button(T["menu_lab"]): st.session_state.page = "lab"
-    
-    st.divider()
+    tab1, tab2, tab3 = st.tabs(["📊 حاسبة BMI", "🧪 استفسار مخبري", "🥘 تحليل غذائي"])
 
-    if st.session_state.page == "bmi":
-        col1, col2, col3 = st.columns(3)
-        with col1: age = st.number_input(T["age"], 1, 100, 25)
-        with col2: weight = st.number_input(T["w"], 30.0, 200.0, 70.0)
-        with col3: height = st.number_input(T["h"], 100.0, 250.0, 170.0)
-        chronic = st.multiselect(T["chronic"], [T["sugar"], T["press"], T["none"]])
-        
-        if st.button(T["btn"]):
-            bmi = weight / ((height/100)**2)
-            st.markdown(f"### BMI: **{bmi:.1f}**")
+    with tab1:
+        st.subheader("حساب مؤشر كتلة الجسم")
+        col1, col2 = st.columns(2)
+        w = col1.number_input("الوزن (كجم)", 30.0, 200.0, 70.0)
+        h = col2.number_input("الطول (سم)", 100.0, 250.0, 170.0)
+        if st.button("احسب وحلل"):
+            bmi = w / ((h/100)**2)
+            st.info(f"مؤشر كتلة جسمك هو: {bmi:.1f}")
+            with st.spinner("جاري استشارة الذكاء الاصطناعي..."):
+                ans = get_ai_response(f"قدم نصيحة قصيرة لشخص مؤشر كتلة جسمه {bmi:.1f}")
+                st.markdown(f"<div class='advice-box'>{ans}</div>", unsafe_allow_html=True)
+
+    with tab2:
+        st.subheader("الأسئلة المخبرية والعلمية")
+        q = st.text_area("اكتب سؤالك (مثلاً: ما هي خطوات صبغة غرام؟)")
+        if st.button("تحليل مخبري"):
+            with st.spinner("جاري البحث في المصادر..."):
+                ans = get_ai_response(q)
+                st.markdown(f"<div class='advice-box'>{ans}</div>", unsafe_allow_html=True)
+
+    with tab3:
+        st.subheader("تحليل الأطباق الجزائرية")
+        dish = st.text_input("اسم الطبق (مثلاً: كسكسي، شربة)")
+        if st.button("تحليل القيمة الغذائية"):
             with st.spinner("جاري التحليل..."):
-                res = get_ai_response(f"نصيحة لشخص عمره {age} وكتلة جسمه {bmi:.1f} وأمراضه {chronic}")
-                st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
+                ans = get_ai_response(f"ما هي القيمة الغذائية لطبق {dish}؟")
+                st.markdown(f"<div class='advice-box'>{ans}</div>", unsafe_allow_html=True)
 
-    elif st.session_state.page == "food":
-        food_query = st.text_input("إسم الطبق")
-        if st.button("تحليل"):
-            with st.spinner("..."):
-                res = get_ai_response(f"حلل القيمة الغذائية لطبق {food_query}")
-                st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
-
-    elif st.session_state.page == "lab":
-        lab_query = st.text_area("سؤالك المخبري")
-        if st.button("بحث"):
-            with st.spinner("..."):
-                res = get_ai_response(f"اشرح مخبرياً: {lab_query}")
-                st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
+    if st.sidebar.button("تسجيل الخروج"):
+        st.session_state.logged_in = False
+        st.rerun()
