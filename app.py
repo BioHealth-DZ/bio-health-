@@ -44,12 +44,12 @@ st.markdown("""
 # 3. دالة الذكاء الاصطناعي (تجاوز خطأ الاتصال في الصورة)
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
-        return "⚠️ مفتاح API غير موجود في Secrets!"
+        return "⚠️ مفتاح API غير موجود في إعدادات Secrets."
     
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # الرابط المصحح للعمل مع الإصدار المستقر v1beta
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
+    # هذا الرابط هو الوحيد الذي يتوافق مع الإصدار الحالي ويتجاوز خطأ 404
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     headers = {'Content-Type': 'application/json'}
     payload = {
@@ -64,12 +64,11 @@ def get_ai_response(prompt):
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # عرض تفاصيل الخطأ بدقة للمساعدة في التشخيص
-            error_details = response.json().get('error', {}).get('message', 'Unknown Error')
-            return f"❌ خطأ من السيرفر ({response.status_code}): {error_details}"
+            # إعادة رسالة الخطأ الخام لفهم ما يحدث في السيرفر
+            error_msg = response.json().get('error', {}).get('message', 'Unknown Error')
+            return f"❌ خطأ من السيرفر ({response.status_code}): {error_msg}"
     except Exception as e:
-        return f"⚠️ فشل الاتصال: {str(e)}"
-    
+        return f"⚠️ فشل الاتصال بالشبكة: {str(e)}"
     api_key = st.secrets["GEMINI_API_KEY"]
     # استخدام الإصدار المستقر v1 لضمان أعلى توافق وتجنب خطأ 404
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
