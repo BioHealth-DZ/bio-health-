@@ -26,7 +26,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. محرك الذكاء الاصطناعي
-def get_ai_response(prompt):
+model = genai.GenerativeModel("gemini-pro")
     try:
         if "GEMINI_API_KEY" not in st.secrets: return "Error: API Key missing"
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
