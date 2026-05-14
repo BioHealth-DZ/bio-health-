@@ -1,10 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. إعدادات الصفحة الأساسية
+# 1. إعدادات الصفحة
 st.set_page_config(page_title="BioHealth DZ", page_icon="🧪", layout="wide")
 
-# 2. التنسيق وإضافة الخلفية الاحترافية
+# 2. التنسيق: الخلفية وتنسيق الأقسام
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -27,22 +27,27 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي - الحل الجذري لخطأ 404
+# 3. دالة الذكاء الاصطناعي - الحل الذكي للقضاء على 404
 def get_ai_response(prompt):
-    try:
-        if "GEMINI_API_KEY" not in st.secrets: return "Error: API Key missing"
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        
-        # المحاولة الأولى باستخدام الموديل الأحدث
-        model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
-        return model.generate_content(prompt).text
-    except Exception:
+    if "GEMINI_API_KEY" not in st.secrets:
+        return "خطأ: مفتاح API غير موجود في إعدادات Secrets"
+    
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    
+    # قائمة بجميع الأسماء المحتملة للموديل حسب إصدار المكتبة
+    possible_models = ["gemini-1.5-flash", "models/gemini-1.5-flash", "gemini-pro", "models/gemini-pro"]
+    
+    last_error = ""
+    for model_name in possible_models:
         try:
-            # المحاولة الثانية (البديلة) في حال وجود نسخة مكتبة قديمة
-            model = genai.GenerativeModel("gemini-pro")
-            return model.generate_content(prompt).text
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text
         except Exception as e:
-            return f"عذراً، حدث خطأ في الاتصال: {str(e)}"
+            last_error = str(e)
+            continue # تجربة الاسم التالي في القائمة
+            
+    return f"لم نتمكن من الاتصال بالموديل. الخطأ الأخير: {last_error}"
 
 # 4. قاعدة بيانات اللغات
 strings = {
@@ -89,56 +94,51 @@ else:
     T = strings[st.session_state.lang]
     st.markdown(f'<div class="main-header"><h1>{T["welcome"]}</h1></div>', unsafe_allow_html=True)
     
-    # قائمة التنقل العلوية
-    nav1, nav2, nav3 = st.columns(3)
-    if nav1.button(T["menu_bmi"]): st.session_state.page = "bmi"
-    if nav2.button(T["menu_food"]): st.session_state.page = "food"
-    if nav3.button(T["menu_lab"]): st.session_state.page = "lab"
+    # أزرار التنقل
+    n1, n2, n3 = st.columns(3)
+    if n1.button(T["menu_bmi"]): st.session_state.page = "bmi"
+    if n2.button(T["menu_food"]): st.session_state.page = "food"
+    if n3.button(T["menu_lab"]): st.session_state.page = "lab"
     
     st.divider()
 
-    # --- قسم حاسبة الصحة ---
     if st.session_state.page == "bmi":
         st.subheader(T["menu_bmi"])
         c1, c2, c3 = st.columns(3)
         with c1: age = st.number_input(T["age"], 1, 100, 25)
         with c2: gender = st.selectbox(T["gender"], [T["male"], T["female"]])
         with c3: weight = st.number_input(T["w"], 30.0, 200.0, 70.0)
-        
         c4, c5 = st.columns(2)
         with c4: height = st.number_input(T["h"], 100.0, 250.0, 170.0)
         with c5: chronic = st.multiselect(T["chronic"], [T["sugar"], T["press"]])
         
         if st.button(T["btn"]):
             bmi = weight / ((height/100)**2)
-            st.markdown(f"### BMI: **{bmi:.1f}**")
-            with st.spinner("جاري التحليل..."):
-                res = get_ai_response(f"حلل الحالة الصحية لـ {gender} عمره {age} و BMI {bmi:.1f} يعاني من {chronic}")
+            with st.spinner("..."):
+                res = get_ai_response(f"Analyze: {gender}, BMI {bmi:.1f}, {chronic}")
                 st.session_state.history.append({"type": T["menu_bmi"], "item": f"BMI:{bmi:.1f}", "result": res})
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
 
-    # --- قسم تحليل الأطباق ---
     elif st.session_state.page == "food":
         st.subheader(T["menu_food"])
-        dish = st.text_input("اسم الطبق الجزائري / Algerian Dish")
+        dish = st.text_input("اسم الطبق / Dish Name")
         if st.button(T["btn"]):
             with st.spinner("..."):
-                res = get_ai_response(f"تحليل غذائي وكيميائي لطبق {dish}")
+                res = get_ai_response(f"Analyze food: {dish}")
                 st.session_state.history.append({"type": T["menu_food"], "item": dish, "result": res})
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
-    # --- قسم الأسئلة المخبرية ---
     elif st.session_state.page == "lab":
         st.subheader(T["menu_lab"])
-        q = st.text_area("اطرح سؤالك حول التحاليل أو البيولوجيا")
+        q = st.text_area("سؤالك المخبري / Lab Question")
         if st.button(T["btn"]):
             with st.spinner("..."):
                 res = get_ai_response(q)
                 st.session_state.history.append({"type": T["menu_lab"], "item": q[:20], "result": res})
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
-    # السجل التاريخي
+    # السجل
     st.divider()
     with st.expander(T["history"]):
         for entry in reversed(st.session_state.history):
-            st.write(f"**{entry['type']} ({entry['item']}):** {entry['result']}")
+            st.write(f"**{entry['type']}:** {entry['result']}")
