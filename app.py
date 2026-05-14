@@ -30,6 +30,15 @@ def get_ai_response(prompt):
     try:
         if "GEMINI_API_KEY" not in st.secrets: return "Error: API Key missing"
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        
+        # هذا هو السطر الذي يتم استبداله
+        model = genai.GenerativeModel("gemini-1.5-flash-latest") 
+        
+        return model.generate_content(prompt).text
+    except Exception as e: return f"Error: {str(e)}"
+    try:
+        if "GEMINI_API_KEY" not in st.secrets: return "Error: API Key missing"
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
         model = genai.GenerativeModel("gemini-1.5-flash")
         return model.generate_content(prompt).text
     except Exception as e: return f"Error: {str(e)}"
