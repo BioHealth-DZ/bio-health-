@@ -2,11 +2,12 @@ import streamlit as st
 import requests
 import json
 import random
+import time
 
 # 1. إعداد الصفحة
 st.set_page_config(page_title="BioHealth DZ", page_icon="💊", layout="wide")
 
-# 2. التنسيق الجمالي (CSS) - الحفاظ على الهوية البصرية الأصلية
+# 2. التنسيق الجمالي (CSS) - الحفاظ التام على التصميم الأصلي
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -41,7 +42,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي - البحث التلقائي عن الموديل المتاح
+# 3. دالة الذكاء الاصطناعي مع نظام "تجاوز الضغط" (Retry Logic)
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
         return "⚠️ Error: API Key not found."
@@ -49,38 +50,34 @@ def get_ai_response(prompt):
     api_key = st.secrets["GEMINI_API_KEY"]
     base_url = "https://generativelanguage.googleapis.com/v1beta"
     
+    # محاولة الحصول على الموديل
     try:
-        # جلب قائمة الموديلات المتاحة
         models_resp = requests.get(f"{base_url}/models?key={api_key}", timeout=10)
-        if models_resp.status_code != 200:
-            return "❌ تعذر جلب قائمة الموديلات."
-        
         available_models = models_resp.json().get('models', [])
-        target_model = None
-        for m in available_models:
-            if "generateContent" in m.get('supportedGenerationMethods', []):
-                target_model = m['name']
-                break
+        target_model = next((m['name'] for m in available_models if "generateContent" in m.get('supportedGenerationMethods', [])), None)
         
-        if not target_model:
-            return "❌ لا يوجد موديل متاح."
+        if not target_model: return "❌ لا يوجد موديل متاح."
 
         url = f"{base_url}/{target_model}:generateContent?key={api_key}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         
-        # التعديل هنا: تم زيادة timeout إلى 60 ثانية لحل مشكلة الأسئلة المخبرية الطويلة
-        response = requests.post(url, json=payload, timeout=60)
+        # محاولة الاتصال 3 مرات في حال وجود ضغط (High Demand)
+        for attempt in range(3):
+            response = requests.post(url, json=payload, timeout=60)
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            elif response.status_code == 503 or "high demand" in response.text.lower():
+                time.sleep(2) # الانتظار قليلاً قبل إعادة المحاولة
+                continue
+            else:
+                break
         
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"❌ خطأ: {response.json().get('error', {}).get('message', 'Unknown error')}"
+        return f"⚠️ السيرفر مضغوط حالياً، يرجى المحاولة بعد لحظات. ({response.status_code})"
             
-    except requests.exceptions.Timeout:
-        return "⚠️ الإجابة استغرقت وقتاً طويلاً جداً، يرجى المحاولة مرة أخرى أو تبسيط السؤال."
     except Exception as e:
         return f"⚠️ عطل فني: {str(e)}"
-# 4. بيانات اللغات
+
+# 4. بيانات اللغات والنصائح
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -100,7 +97,7 @@ strings = {
     }
 }
 
-# 5. منطق الدخول
+# 5. منطق الدخول واختيار اللغة
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -138,7 +135,6 @@ else:
         col4, col5 = st.columns(2)
         with col4: height = st.number_input(T["h"], 100.0, 250.0, 170.0)
         with col5: chronic = st.multiselect(T["chronic"], [T["sugar"], T["press"], T["none"]])
-        
         if st.button(T["btn"]):
             bmi = weight / ((height/100)**2)
             st.markdown(f"### BMI: **{bmi:.1f}**")
@@ -159,5 +155,5 @@ else:
         lab_query = st.text_area("سؤالك المخبري")
         if st.button("بحث"):
             with st.spinner("..."):
-                res = get_ai_response(f"شرح مخبري لـ: {lab_query}")
+                res = get_ai_response(f"شرح مخبري مفصل لـ: {lab_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
