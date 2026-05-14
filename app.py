@@ -42,43 +42,37 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي مع حل مشكلة اللغة والضغط (429)
+# 3. دالة الذكاء الاصطناعي - النسخة المطورة لحل مشكلة الضغط (429) واللغة
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
         return "⚠️ Error: API Key not found."
     
     api_key = st.secrets["GEMINI_API_KEY"]
-    # إجبار الموديل على الرد بالعربية دائماً
-    full_prompt = f"أجب باللغة العربية فقط وبشكل مفصل: {prompt}"
+    # إجبار الرد بالعربية
+    full_prompt = f"أجب باللغة العربية فقط وبشكل دقيق ومفصل: {prompt}"
     
-    base_url = "https://generativelanguage.googleapis.com/v1beta"
+    # استخدام موديل Flash الأسرع لتجنب الزحام
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
-    try:
-        # البحث التلقائي عن الموديل المتاح
-        models_resp = requests.get(f"{base_url}/models?key={api_key}", timeout=10)
-        available_models = models_resp.json().get('models', [])
-        target_model = next((m['name'] for m in available_models if "generateContent" in m.get('supportedGenerationMethods', [])), "models/gemini-1.5-flash")
-
-        url = f"{base_url}/{target_model}:generateContent?key={api_key}"
-        payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
-        
-        # محاولة الاتصال مع معالجة خطأ 429 (الضغط)
-        for attempt in range(3):
+    # محاولة الاتصال 3 مرات مع نظام انتظار متزايد
+    for attempt in range(3):
+        try:
             response = requests.post(url, json=payload, timeout=60)
             if response.status_code == 200:
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             elif response.status_code == 429:
-                time.sleep(10) # الانتظار 10 ثواني في حال الضغط وإعادة المحاولة
+                time.sleep(7 * (attempt + 1)) # زيادة وقت الانتظار تلقائياً
                 continue
             else:
-                break
-        
-        return f"⚠️ السيرفر مضغوط (429). يرجى المحاولة مرة أخرى بعد دقيقة واحدة."
+                return f"⚠️ عذراً، السيرفر مشغول حالياً (خطأ {response.status_code}). حاول مرة أخرى بعد قليل."
+        except Exception:
+            time.sleep(2)
+            continue
             
-    except Exception as e:
-        return f"⚠️ عطل فني: {str(e)}"
+    return "⚠️ لا يزال السيرفر مضغوطاً. يرجى الانتظار دقيقة واحدة ثم المحاولة مجدداً."
 
-# 4. بيانات اللغات
+# 4. نصوص اللغات
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -98,7 +92,7 @@ strings = {
     }
 }
 
-# 5. منطق الدخول واختيار اللغة
+# 5. منطق الدخول
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -139,22 +133,22 @@ else:
         if st.button(T["btn"]):
             bmi = weight / ((height/100)**2)
             st.markdown(f"### BMI: **{bmi:.1f}**")
-            with st.spinner("جاري التحليل..."):
-                res = get_ai_response(f"نصيحة صحية لـ {age} سنة، {gender}، كتلة جسم {bmi:.1f}، يعاني من {chronic}")
+            with st.spinner("جاري تحليل الحالة..."):
+                res = get_ai_response(f"قدم نصيحة طبية لـ {age} سنة، {gender}، كتلة جسم {bmi:.1f}، يعاني من {chronic}")
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "food":
         st.subheader(T["menu_food"])
-        food_query = st.text_input("إسم الطبق")
-        if st.button("تحليل"):
-            with st.spinner("جاري تحليل المكونات..."):
-                res = get_ai_response(f"حلل القيمة الغذائية لطبق {food_query}")
+        food_query = st.text_input("إسم الطبق الجزائري أو العالمي")
+        if st.button("تحليل المكونات"):
+            with st.spinner("جاري التحليل الغذائي..."):
+                res = get_ai_response(f"حلل القيمة الغذائية والسعرات الحرارية لطبق: {food_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "lab":
         st.subheader(T["menu_lab"])
-        lab_query = st.text_area("سؤالك المخبري")
-        if st.button("بحث"):
-            with st.spinner("جاري البحث المخبري المفصل..."):
-                res = get_ai_response(f"اشرح بالتفصيل من وجهة نظر مخبرية: {lab_query}")
+        lab_query = st.text_area("اطرح سؤالك حول التحاليل، البكتيريا، أو فصائل الدم")
+        if st.button("بحث مخبري"):
+            with st.spinner("جاري البحث في المصادر العلمية..."):
+                res = get_ai_response(f"اشرح بالتفصيل العلمي المخبري: {lab_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
