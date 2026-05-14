@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import random
+import time
 
 # 1. إعداد الصفحة والتصميم
 st.set_page_config(page_title="BioHealth DZ", page_icon="💊", layout="wide")
@@ -26,36 +27,27 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. وظيفة البحث عن الموديل المتاح (هذا هو الحل السحري)
-def get_working_model():
-    if "GEMINI_API_KEY" not in st.secrets:
-        return None
-    
+# 2. إعداد الموديل (تم اختيار gemini-1.5-flash لأنه الأفضل في الحصة المجانية)
+if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    
-    try:
-        # جلب كل الموديلات المتاحة لمفتاحك
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                return m.name  # سيعيد مثلاً 'models/gemini-1.5-flash'
-    except:
-        return None
-    return None
 
 def get_ai_response(prompt):
-    model_name = get_working_model()
-    if not model_name:
-        return "⚠️ لا يمكن الوصول لموديلات جوجل. تأكدي من صحة الـ API Key في الإعدادات."
-    
     try:
-        model = genai.GenerativeModel(model_name)
-        full_prompt = f"أجب باللغة العربية فقط: {prompt}"
+        # قمنا بتثبيت هذا الموديل لأنه يدعم حتى 15 طلب في الدقيقة و1500 طلب في اليوم غالباً
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # إضافة تعليمات لتقليل حجم الرد (لتوفير الرصيد)
+        full_prompt = f"أجب باللغة العربية باختصار مفيد ودقة طبية: {prompt}"
+        
         response = model.generate_content(full_prompt)
         return response.text
     except Exception as e:
-        return f"⚠️ خطأ في الاتصال: {str(e)}"
+        error_msg = str(e)
+        if "429" in error_msg:
+            return "❌ انتهت الحصة المجانية المتاحة حالياً. يرجى المحاولة بعد قليل (السيرفر تحت ضغط المستخدمين)."
+        return f"⚠️ خطأ في الاتصال: {error_msg}"
 
-# 3. بيانات اللغات
+# --- باقي الكود (بيانات اللغات والصفحات) كما هو تماماً دون تغيير ---
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -75,7 +67,6 @@ strings = {
     }
 }
 
-# 4. منطق التطبيق
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
