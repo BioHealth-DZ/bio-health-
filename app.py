@@ -42,42 +42,43 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي مع نظام "تجاوز الضغط" (Retry Logic)
+# 3. دالة الذكاء الاصطناعي مع حل مشكلة اللغة والضغط (429)
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
         return "⚠️ Error: API Key not found."
     
     api_key = st.secrets["GEMINI_API_KEY"]
+    # إجبار الموديل على الرد بالعربية دائماً
+    full_prompt = f"أجب باللغة العربية فقط وبشكل مفصل: {prompt}"
+    
     base_url = "https://generativelanguage.googleapis.com/v1beta"
     
-    # محاولة الحصول على الموديل
     try:
+        # البحث عن الموديل المتاح
         models_resp = requests.get(f"{base_url}/models?key={api_key}", timeout=10)
         available_models = models_resp.json().get('models', [])
-        target_model = next((m['name'] for m in available_models if "generateContent" in m.get('supportedGenerationMethods', [])), None)
-        
-        if not target_model: return "❌ لا يوجد موديل متاح."
+        target_model = next((m['name'] for m in available_models if "generateContent" in m.get('supportedGenerationMethods', [])), "models/gemini-1.5-flash")
 
         url = f"{base_url}/{target_model}:generateContent?key={api_key}"
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
         
-        # محاولة الاتصال 3 مرات في حال وجود ضغط (High Demand)
+        # محاولة الاتصال مع معالجة خطأ 429 (الضغط)
         for attempt in range(3):
             response = requests.post(url, json=payload, timeout=60)
             if response.status_code == 200:
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
-            elif response.status_code == 503 or "high demand" in response.text.lower():
-                time.sleep(2) # الانتظار قليلاً قبل إعادة المحاولة
+            elif response.status_code == 429:
+                time.sleep(5) # الانتظار 5 ثواني في حال الضغط
                 continue
             else:
                 break
         
-        return f"⚠️ السيرفر مضغوط حالياً، يرجى المحاولة بعد لحظات. ({response.status_code})"
+        return f"⚠️ السيرفر مضغوط (429). يرجى المحاولة مرة أخرى بعد دقيقة واحدة."
             
     except Exception as e:
         return f"⚠️ عطل فني: {str(e)}"
 
-# 4. بيانات اللغات والنصائح
+# 4. بيانات اللغات (كما هي)
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -97,7 +98,7 @@ strings = {
     }
 }
 
-# 5. منطق الدخول واختيار اللغة
+# 5. منطق البرنامج (كما هو)
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -138,22 +139,22 @@ else:
         if st.button(T["btn"]):
             bmi = weight / ((height/100)**2)
             st.markdown(f"### BMI: **{bmi:.1f}**")
-            with st.spinner("Analyzing..."):
-                res = get_ai_response(f"Advice for {age}y {gender}, BMI {bmi:.1f}, {chronic}")
+            with st.spinner("جاري التحليل..."):
+                res = get_ai_response(f"نصيحة صحية لـ {age} سنة، {gender}، كتلة جسم {bmi:.1f}، يعاني من {chronic}")
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "food":
         st.subheader(T["menu_food"])
         food_query = st.text_input("إسم الطبق")
         if st.button("تحليل"):
-            with st.spinner("..."):
-                res = get_ai_response(f"تحليل طبق {food_query}")
+            with st.spinner("جاري تحليل المكونات..."):
+                res = get_ai_response(f"حلل القيمة الغذائية لطبق {food_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "lab":
         st.subheader(T["menu_lab"])
         lab_query = st.text_area("سؤالك المخبري")
         if st.button("بحث"):
-            with st.spinner("..."):
-                res = get_ai_response(f"شرح مخبري مفصل لـ: {lab_query}")
+            with st.spinner("جاري البحث المخبري المفصل..."):
+                res = get_ai_response(f"اشرح بالتفصيل من وجهة نظر مخبرية: {lab_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
