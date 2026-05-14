@@ -6,7 +6,7 @@ import random
 # 1. إعداد الصفحة
 st.set_page_config(page_title="BioHealth DZ", page_icon="💊", layout="wide")
 
-# 2. التنسيق الجمالي (CSS) - الحفاظ على التصميم الأصلي
+# 2. التنسيق الجمالي (CSS) - الحفاظ على الهوية البصرية الأصلية
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -41,15 +41,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي - التصحيح الجذري للرابط (v1beta + gemini-1.5-flash-latest)
+# 3. دالة الذكاء الاصطناعي - استخدام الموديل المستقر v1/gemini-pro
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
         return "⚠️ Error: API Key not found in Streamlit Secrets."
     
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # استخدام الرابط المباشر للموديل الأحدث لتجنب 404 نهائياً
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
+    # محاولة استخدام الموديل المستقر gemini-pro عبر النسخة v1
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
     
     headers = {'Content-Type': 'application/json'}
     payload = {
@@ -63,13 +63,18 @@ def get_ai_response(prompt):
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            # إظهار رسالة الخطأ القادمة من السيرفر مباشرة
-            error_details = response.json().get('error', {}).get('message', 'Unknown Error')
-            return f"❌ السيرفر لا يستجيب حالياً ({response.status_code}): {error_details}"
+            # إذا فشل، نحاول المحاولة الأخيرة بموديل gemini-1.5-flash بدون كلمة latest
+            backup_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            response = requests.post(backup_url, json=payload, headers=headers, timeout=15)
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            
+            error_details = response.json().get('error', {}).get('message', response.text)
+            return f"❌ خطأ في السيرفر ({response.status_code}): {error_details}"
     except Exception as e:
         return f"⚠️ فشل الاتصال: {str(e)}"
 
-# 4. بيانات اللغات والنصائح
+# 4. بيانات اللغات (نفس الترتيب والمحتوى السابق)
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -89,7 +94,7 @@ strings = {
     }
 }
 
-# 5. منطق الدخول واختيار اللغة
+# 5. منطق الدخول واختيار اللغة (ثابت كما هو)
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -108,7 +113,6 @@ if not st.session_state.logged:
 else:
     T = strings[st.session_state.lang]
     st.markdown(f'<div class="main-header"><h1>{T["welcome"]}</h1><p>مرحباً، {st.session_state.user} 👋</p></div>', unsafe_allow_html=True)
-    
     st.markdown(f'<div class="tip-card">{random.choice(T["tips"])}</div>', unsafe_allow_html=True)
 
     nav1, nav2, nav3 = st.columns(3)
@@ -126,7 +130,6 @@ else:
         with col1: age = st.number_input(T["age"], 1, 100, 25)
         with col2: gender = st.selectbox(T["gender"], [T["male"], T["female"]])
         with col3: weight = st.number_input(T["w"]+" ⚖️", 30.0, 200.0, 70.0)
-        
         col4, col5 = st.columns(2)
         with col4: height = st.number_input(T["h"]+" 📏", 100.0, 250.0, 170.0)
         with col5: chronic = st.multiselect(T["chronic"], [T["sugar"], T["press"], T["none"]])
@@ -135,7 +138,7 @@ else:
             bmi = weight / ((height/100)**2)
             st.markdown(f"### BMI: **{bmi:.1f}**")
             with st.spinner("Analyzing..."):
-                prompt = f"Give health advice for {age} years old, {gender}, BMI {bmi:.1f}, conditions: {chronic}. Focus on nutrition."
+                prompt = f"Give health advice for {age} years old, {gender}, BMI {bmi:.1f}, conditions: {chronic}."
                 res = get_ai_response(prompt)
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
 
@@ -144,13 +147,13 @@ else:
         food_query = st.text_input("إسم الطبق (مثلاً: كسكسي، شربة)")
         if st.button("تحليل المكونات 🥗"):
             with st.spinner("جاري التحليل..."):
-                res = get_ai_response(f"ما هي المكونات والقيمة الغذائية التقريبية لطبق: {food_query}")
+                res = get_ai_response(f"ما هي المكونات والقيمة الغذائية لطبق: {food_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "lab":
         st.subheader(T["menu_lab"])
-        lab_query = st.text_area("أدخل سؤالك المخبري هنا (مثلاً: شرح تلوين Ziehl-Neelsen)")
+        lab_query = st.text_area("سؤالك المخبري (مثلاً: Ziehl-Neelsen)")
         if st.button("بحث طبي 🔬"):
             with st.spinner("جاري البحث..."):
-                res = get_ai_response(f"بصفتك خبيراً مخبرياً، اشرح بالتفصيل: {lab_query}")
+                res = get_ai_response(f"اشرح بالتفصيل: {lab_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
