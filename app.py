@@ -2,10 +2,10 @@ import streamlit as st
 import requests
 import json
 
-# 1. إعداد الصفحة
+# 1. إعدادات الصفحة
 st.set_page_config(page_title="BioHealth DZ", page_icon="🧪", layout="wide")
 
-# 2. التنسيق (كامل الواجهة)
+# 2. التنسيق الكامل (إعادة الخلفية والألوان التي اختفت)
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -16,89 +16,87 @@ st.markdown("""
     }
     .main-header {
         background: linear-gradient(90deg, #1b5e20, #43a047);
-        color: white !important; padding: 25px; border-radius: 20px; text-align: center; margin-bottom: 20px;
+        color: white !important; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 20px;
     }
     .advice-box {
-        background-color: #ffffff; border-left: 10px solid #1b5e20;
-        padding: 20px; border-radius: 10px; color: #1b5e20; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        background-color: #ffffff; border-right: 10px solid #1b5e20;
+        padding: 20px; border-radius: 10px; color: #1b5e20; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    div.stButton > button { width: 100%; border-radius: 10px; height: 50px; font-weight: bold; background-color: #1b5e20; color: white; }
+    div.stButton > button { width: 100%; border-radius: 10px; background-color: #1b5e20; color: white; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي - تجاوز خطأ 404 نهائياً عبر HTTP
+# 3. دالة الاتصال (تعديل جذري لتجاوز 404 وتجربة كل الموديلات المتاحة)
 def get_ai_response(prompt):
-    try:
-        api_key = st.secrets["GEMINI_API_KEY"]
-        # استخدام رابط الـ API المباشر (تجاوز المكتبة المصابة بالخطأ)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-        
-        headers = {'Content-Type': 'application/json'}
-        data = {"contents": [{"parts": [{"text": prompt}]}]}
-        
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-        res_json = response.json()
-        
-        if response.status_code == 200:
-            return res_json['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"خطأ من جوجل: {res_json.get('error', {}).get('message', 'Unknown Error')}"
-    except Exception as e:
-        return f"فشل الاتصال المباشر: {str(e)}"
+    api_key = st.secrets["GEMINI_API_KEY"]
+    # سنحاول تجربة الموديلات بالترتيب، بدءاً من flash وصولاً إلى pro القديم
+    model_names = ["gemini-1.5-flash", "gemini-pro"]
+    
+    for name in model_names:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{name}:generateContent?key={api_key}"
+        try:
+            response = requests.post(
+                url, 
+                headers={'Content-Type': 'application/json'},
+                data=json.dumps({"contents": [{"parts": [{"text": prompt}]}]}),
+                timeout=10
+            )
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+        except:
+            continue
+            
+    return "عذراً، يبدو أن هناك مشكلة في إصدار الـ API الخاص بجوجل حالياً. يرجى التأكد من صلاحية المفتاح."
 
-# 4. اللغات والواجهة (كما صممناها سابقاً)
+# 4. إدارة اللغات
 strings = {
     "العربية": {
         "welcome": "مرحباً بك في BioHealth DZ", "enter": "دخول", "name": "الاسم الكامل",
         "menu_bmi": "📊 حاسبة الصحة", "menu_food": "🥘 تحليل الأطباق", "menu_lab": "🔬 الأسئلة المخبرية",
         "age": "العمر", "gender": "الجنس", "male": "ذكر", "female": "أنثى", "w": "الوزن (كغ)", "h": "الطول (سم)",
         "chronic": "الأمراض المزمنة", "sugar": "سكري", "press": "ضغط دم", "none": "لا يوجد",
-        "btn": "تحليل", "res": "النتائج:", "history": "📜 سجل النتائج"
-    },
-    "English": {
-        "welcome": "Welcome to BioHealth DZ", "enter": "Login", "name": "Full Name",
-        "menu_bmi": "📊 Health Calc", "menu_food": "🥘 Food Analysis", "menu_lab": "🔬 Lab Questions",
-        "age": "Age", "gender": "Gender", "male": "Male", "female": "Female", "w": "Weight (kg)", "h": "Height (cm)",
-        "chronic": "Chronic Diseases", "sugar": "Diabetes", "press": "Blood Pressure", "none": "None",
-        "btn": "Analyze", "res": "Results:", "history": "📜 Result History"
+        "btn": "تحليل", "res": "النتائج:"
     }
 }
 
-# (باقي كود إدارة الحالة والواجهة - نفس الذي نملكه)
+# 5. إدارة الحالة والتنقل
 if 'logged' not in st.session_state: st.session_state.logged = False
-if 'history' not in st.session_state: st.session_state.history = []
 if 'page' not in st.session_state: st.session_state.page = "bmi"
 
 if not st.session_state.logged:
     st.markdown("<h1 style='text-align:center;'>🧪 BioHealth DZ</h1>", unsafe_allow_html=True)
-    sl = st.selectbox("اللغة", ["العربية", "English"])
-    un = st.text_input(strings[sl]["name"])
-    if st.button(strings[sl]["enter"]):
-        if un:
-            st.session_state.logged, st.session_state.lang = True, sl
-            st.rerun()
+    un = st.text_input("الاسم الكامل")
+    if st.button("دخول"):
+        if un: st.session_state.logged, st.session_state.lang = True, "العربية"; st.rerun()
 else:
     T = strings[st.session_state.lang]
     st.markdown(f'<div class="main-header"><h1>{T["welcome"]}</h1></div>', unsafe_allow_html=True)
     
-    n1, n2, n3 = st.columns(3)
-    if n1.button(T["menu_bmi"]): st.session_state.page = "bmi"
-    if n2.button(T["menu_food"]): st.session_state.page = "food"
-    if n3.button(T["menu_lab"]): st.session_state.page = "lab"
+    # قائمة التنقل كما في الصورة Capture d'écran 2026-05-14 171122.png
+    nav1, nav2, nav3 = st.columns(3)
+    if nav1.button(T["menu_bmi"]): st.session_state.page = "bmi"
+    if nav2.button(T["menu_food"]): st.session_state.page = "food"
+    if nav3.button(T["menu_lab"]): st.session_state.page = "lab"
     
     st.divider()
 
     if st.session_state.page == "bmi":
-        st.subheader(T["menu_bmi"])
-        c1, c2, c3 = st.columns(3)
-        with c1: age = st.number_input(T["age"], 1, 100, 25)
-        with c2: gender = st.selectbox(T["gender"], [T["male"], T["female"]])
-        with c3: weight = st.number_input(T["w"], 30.0, 200.0, 70.0)
-        c4, h_in = st.columns([1,1])
-        height = h_in.number_input(T["h"], 100.0, 250.0, 170.0)
+        st.markdown(f"### {T['menu_bmi']}")
+        # استعادة تقسيم الأعمدة الثلاثة الذي ظهر في صورتك
+        col1, col2, col3 = st.columns(3)
+        with col1: age = st.number_input(T["age"], 1, 100, 25)
+        with col2: gender = st.selectbox(T["gender"], [T["male"], T["female"]])
+        with col3: weight = st.number_input(T["w"], 30.0, 200.0, 70.0)
+        
+        # استعادة خانة الطول والأمراض المزمنة التي فُقدت
+        col4, col5 = st.columns(2)
+        with col4: height = st.number_input(T["h"], 100.0, 250.0, 170.0)
+        with col5: chronic = st.multiselect(T["chronic"], [T["sugar"], T["press"], T["none"]])
         
         if st.button(T["btn"]):
             bmi = weight / ((height/100)**2)
+            st.markdown(f"### BMI: **{bmi:.1f}**")
             with st.spinner("جاري التحليل..."):
-                res = get_ai_response(f"نصيحة لمستخدم: {gender}, BMI {bmi:.1f}")
+                prompt = f"قدم نصيحة طبية لشخص عمره {age} وجنسه {gender} ولديه BMI {bmi:.1f} وأمراض {chronic}"
+                res = get_ai_response(prompt)
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
