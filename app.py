@@ -9,7 +9,7 @@ hide_style = """
     [data-testid="stHeader"] {display:none;}
     </style>
     """
-st.markdown(hide_style, unsafe_allow_html=True)
+st.markdown('<style>#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;} .stAppDeployButton {display:none;} [data-testid="stHeader"] {display:none;}</style>', unsafe_allow_html=True)
 import streamlit as st
 import google.generativeai as genai
 
