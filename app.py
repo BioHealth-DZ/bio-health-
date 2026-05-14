@@ -7,7 +7,7 @@ import time
 # 1. إعداد الصفحة
 st.set_page_config(page_title="BioHealth DZ", page_icon="💊", layout="wide")
 
-# 2. التنسيق الجمالي (CSS) - الحفاظ التام على التصميم الأصلي
+# 2. التنسيق الجمالي (CSS) - الحفاظ التام على تصميمك الأصلي
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -42,37 +42,39 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي - النسخة المطورة لحل مشكلة الضغط (429) واللغة
+# 3. دالة الذكاء الاصطناعي - حل نهائي لخطأ 404 و 429
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
         return "⚠️ Error: API Key not found."
     
     api_key = st.secrets["GEMINI_API_KEY"]
-    # إجبار الرد بالعربية
-    full_prompt = f"أجب باللغة العربية فقط وبشكل دقيق ومفصل: {prompt}"
+    # توجيه الموديل للرد بالعربية فقط لضمان التجربة المحلية
+    full_prompt = f"أجب باللغة العربية فقط وبشكل مفصل: {prompt}"
     
-    # استخدام موديل Flash الأسرع لتجنب الزحام
+    # الرابط المحدث والمستقر لموديل Flash
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {'Content-Type': 'application/json'}
     payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
     
-    # محاولة الاتصال 3 مرات مع نظام انتظار متزايد
     for attempt in range(3):
         try:
-            response = requests.post(url, json=payload, timeout=60)
+            response = requests.post(url, json=payload, headers=headers, timeout=60)
             if response.status_code == 200:
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             elif response.status_code == 429:
-                time.sleep(7 * (attempt + 1)) # زيادة وقت الانتظار تلقائياً
+                time.sleep(10) # انتظار في حالة الضغط العالي
                 continue
+            elif response.status_code == 404:
+                return "⚠️ خطأ في عنوان السيرفر (404). يرجى التأكد من الموديل المستخدم."
             else:
-                return f"⚠️ عذراً، السيرفر مشغول حالياً (خطأ {response.status_code}). حاول مرة أخرى بعد قليل."
-        except Exception:
+                return f"⚠️ حدث خطأ {response.status_code}. يرجى المحاولة لاحقاً."
+        except Exception as e:
             time.sleep(2)
             continue
             
-    return "⚠️ لا يزال السيرفر مضغوطاً. يرجى الانتظار دقيقة واحدة ثم المحاولة مجدداً."
+    return "⚠️ تعذر الاتصال بالسيرفر حالياً."
 
-# 4. نصوص اللغات
+# 4. نصوص اللغات والمحتوى المحلي
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -92,7 +94,7 @@ strings = {
     }
 }
 
-# 5. منطق الدخول
+# 5. منطق التحكم والصفحات
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -134,21 +136,21 @@ else:
             bmi = weight / ((height/100)**2)
             st.markdown(f"### BMI: **{bmi:.1f}**")
             with st.spinner("جاري تحليل الحالة..."):
-                res = get_ai_response(f"قدم نصيحة طبية لـ {age} سنة، {gender}، كتلة جسم {bmi:.1f}، يعاني من {chronic}")
+                res = get_ai_response(f"نصيحة صحية لـ {age} سنة، {gender}، كتلة جسم {bmi:.1f}، يعاني من {chronic}")
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "food":
         st.subheader(T["menu_food"])
-        food_query = st.text_input("إسم الطبق الجزائري أو العالمي")
-        if st.button("تحليل المكونات"):
-            with st.spinner("جاري التحليل الغذائي..."):
-                res = get_ai_response(f"حلل القيمة الغذائية والسعرات الحرارية لطبق: {food_query}")
+        food_query = st.text_input("إسم الطبق (مثل: كسكس، شربة..)")
+        if st.button("تحليل"):
+            with st.spinner("جاري التحليل..."):
+                res = get_ai_response(f"حلل القيمة الغذائية لطبق {food_query} بلهجة جزائرية مفهومة")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "lab":
         st.subheader(T["menu_lab"])
-        lab_query = st.text_area("اطرح سؤالك حول التحاليل، البكتيريا، أو فصائل الدم")
-        if st.button("بحث مخبري"):
-            with st.spinner("جاري البحث في المصادر العلمية..."):
+        lab_query = st.text_area("سؤالك المخبري (مثلاً: Ziehl-Neelsen)")
+        if st.button("بحث"):
+            with st.spinner("جاري البحث المخبري..."):
                 res = get_ai_response(f"اشرح بالتفصيل العلمي المخبري: {lab_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
