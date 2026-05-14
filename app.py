@@ -4,7 +4,7 @@ import google.generativeai as genai
 # 1. إعدادات الصفحة
 st.set_page_config(page_title="BioHealth DZ", page_icon="🧪", layout="wide")
 
-# 2. التنسيق وإخفاء أشرطة GitHub (للمظهر الاحترافي)
+# 2. التنسيق وإخفاء أشرطة GitHub
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -14,16 +14,16 @@ st.markdown("""
     .stApp { background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%) !important; }
     .main-header {
         background: linear-gradient(90deg, #1b5e20, #43a047);
-        color: white !important; padding: 15px; border-radius: 15px; text-align: center;
+        color: white !important; padding: 25px; border-radius: 20px; text-align: center; margin-bottom: 20px;
     }
-    .history-box {
-        background-color: #f1f8e9; border: 1px solid #c8e6c9;
-        padding: 10px; border-radius: 10px; margin-top: 5px; font-size: 0.9rem;
+    .advice-box {
+        background-color: #ffffff; border-left: 10px solid #1b5e20;
+        padding: 20px; border-radius: 10px; color: #1b5e20; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي
+# 3. محرك الذكاء الاصطناعي
 def get_ai_response(prompt):
     try:
         if "GEMINI_API_KEY" not in st.secrets: return "Error: API Key missing"
@@ -32,26 +32,35 @@ def get_ai_response(prompt):
         return model.generate_content(prompt).text
     except Exception as e: return f"Error: {str(e)}"
 
-# 4. قاعدة البيانات (عربي، فرنسي، إنجليزي)
+# 4. قاعدة بيانات اللغات (إضافة الإنجليزية مع الحفاظ على كل الخيارات)
 strings = {
     "العربية": {
-        "welcome": "BioHealth DZ", "name": "الاسم الكامل", "enter": "دخول",
-        "menu_bmi": "📊 حاسبة الصحة", "menu_food": "🥘 تحليل الغذاء", "menu_lab": "🔬 المخبر",
-        "btn": "تحليل", "history": "📜 السجل (النتائج السابقة)", "no_history": "لا توجد نتائج محفوظة بعد"
+        "welcome": "BioHealth DZ مرحباً بك في", "enter": "دخول", "name": "الاسم الكامل",
+        "menu_bmi": "📊 حاسبة الصحة والوزن", "menu_food": "🥘 تحليل الغذاء", "menu_lab": "🔬 الأسئلة المخبرية",
+        "age": "العمر", "gender": "الجنس", "male": "ذكر", "female": "أنثى", "w": "الوزن (كغ)", "h": "الطول (سم)",
+        "chronic": "الأمراض المزمنة", "sugar": "سكري", "press": "ضغط دم", "none": "لا يوجد",
+        "lady": "حالات خاصة", "preg": "حامل", "nurse": "مرضعة", "btn": "تحليل الحالة", "res": "النتائج والنصائح:",
+        "history": "📜 السجل (النتائج السابقة)", "no_history": "لا توجد نتائج محفوظة بعد"
     },
     "English": {
-        "welcome": "Welcome to BioHealth DZ", "name": "Full Name", "enter": "Login",
-        "menu_bmi": "📊 BMI Calculator", "menu_food": "🥘 Food Analysis", "menu_lab": "🔬 Lab Questions",
-        "btn": "Analyze", "history": "📜 Result History", "no_history": "No results saved yet"
+        "welcome": "Welcome to BioHealth DZ", "enter": "Login", "name": "Full Name",
+        "menu_bmi": "📊 BMI & Health Calculator", "menu_food": "🥘 Food Analysis", "menu_lab": "🔬 Lab Questions",
+        "age": "Age", "gender": "Gender", "male": "Male", "female": "Female", "w": "Weight (kg)", "h": "Height (cm)",
+        "chronic": "Chronic Diseases", "sugar": "Diabetes", "press": "Blood Pressure", "none": "None",
+        "lady": "Special Cases", "preg": "Pregnant", "nurse": "Breastfeeding", "btn": "Analyze Status", "res": "Results:",
+        "history": "📜 Result History", "no_history": "No saved results yet"
     },
     "Français": {
-        "welcome": "Bienvenue sur BioHealth DZ", "name": "Nom Complet", "enter": "Entrer",
-        "menu_bmi": "📊 Calcul IMC", "menu_food": "🥘 Analyse Plats", "menu_lab": "🔬 Labo",
-        "btn": "Analyser", "history": "📜 Historique", "no_history": "Aucun résultat enregistré"
+        "welcome": "Bienvenue sur BioHealth DZ", "enter": "Entrer", "name": "Nom Complet",
+        "menu_bmi": "📊 IMC & Santé", "menu_food": "🥘 Analyse de Plats", "menu_lab": "🔬 Questions Labo",
+        "age": "Âge", "gender": "Sexe", "male": "Homme", "female": "Femme", "w": "Poids (kg)", "h": "Taille (cm)",
+        "chronic": "Maladies", "sugar": "Diabète", "press": "Tension", "none": "Aucun",
+        "lady": "États spéciaux", "preg": "Enceinte", "nurse": "Allaitante", "btn": "Analyser", "res": "Résultats:",
+        "history": "📜 Historique", "no_history": "Aucun résultat"
     }
 }
 
-# 5. إدارة الجلسة والسجل
+# 5. إدارة الجلسة
 if 'logged' not in st.session_state: st.session_state.logged = False
 if 'history' not in st.session_state: st.session_state.history = []
 
@@ -65,44 +74,54 @@ if not st.session_state.logged:
             st.rerun()
 else:
     T = strings[st.session_state.lang]
-    st.sidebar.title(f"👤 {st.session_state.user}")
-    choice = st.sidebar.radio("Menu", [T["menu_bmi"], T["menu_food"], T["menu_lab"]])
-    
-    st.markdown(f'<div class="main-header"><h2>{T["welcome"]}</h2></div>', unsafe_allow_html=True)
+    st.sidebar.markdown(f"### 👤 {st.session_state.user}")
+    choice = st.sidebar.radio("Navigate", [T["menu_bmi"], T["menu_food"], T["menu_lab"]])
+    st.markdown(f'<div class="main-header"><h1>{T["welcome"]}</h1></div>', unsafe_allow_html=True)
 
-    # --- قسم تحليل الغذاء ---
-    if choice == T["menu_food"]:
-        st.subheader(T["menu_food"])
-        dish = st.text_input("Dish / الطبق")
-        if st.button(T["btn"]):
-            with st.spinner("..."):
-                res = get_ai_response(f"Analyze the dish '{dish}' biochemically in {st.session_state.lang}.")
-                st.session_state.history.append({"type": T["menu_food"], "item": dish, "result": res})
-                st.info(res)
+    # --- القسم الأول: حاسبة الصحة (تم استرجاع كل العناصر) ---
+    if choice == T["menu_bmi"]:
+        c1, c2, c3 = st.columns(3)
+        with c1: age = st.number_input(T["age"], 1, 100, 25)
+        with c2: gender = st.selectbox(T["gender"], [T["male"], T["female"]])
+        with c3: w = st.number_input(T["w"], 30.0, 200.0, 70.0)
+        c4, c5 = st.columns(2)
+        with c4: h = st.number_input(T["h"], 100.0, 250.0, 170.0)
+        with c5: chronic = st.multiselect(T["chronic"], [T["sugar"], T["press"]])
+        spec = T["none"]
+        if gender == T["female"]:
+            spec = st.radio(T["lady"], [T["none"], T["preg"], T["nurse"]], horizontal=True)
 
-    # --- قسم BMI ---
-    elif choice == T["menu_bmi"]:
-        w = st.number_input("Weight (kg)", 30, 200, 70)
-        h = st.number_input("Height (cm)", 100, 250, 170)
         if st.button(T["btn"]):
             bmi = w / ((h/100)**2)
-            res = f"BMI: {bmi:.1f}"
-            st.session_state.history.append({"type": T["menu_bmi"], "item": f"W:{w} H:{h}", "result": res})
-            st.success(res)
+            st.markdown(f"### BMI: **{bmi:.1f}**")
+            with st.spinner("..."):
+                p = f"Analyze: {gender}, {age}y, BMI {bmi:.1f}, Chronic: {chronic}, Status: {spec}. In {st.session_state.lang}."
+                res = get_ai_response(p)
+                st.session_state.history.append({"type": T["menu_bmi"], "item": f"BMI:{bmi:.1f}", "result": res})
+                st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
 
-    # --- قسم المخبر ---
+    # --- القسم الثاني: تحليل الغذاء ---
+    elif choice == T["menu_food"]:
+        dish = st.text_input("Dish Name / اسم الطبق")
+        if st.button(T["btn"]):
+            with st.spinner("..."):
+                res = get_ai_response(f"Analyze the dish {dish} biochemically for health.")
+                st.session_state.history.append({"type": T["menu_food"], "item": dish, "result": res})
+                st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
+
+    # --- القسم الثالث: الأسئلة المخبرية ---
     elif choice == T["menu_lab"]:
         q = st.text_area("Question?")
         if st.button(T["btn"]):
-            res = get_ai_response(q)
-            st.session_state.history.append({"type": T["menu_lab"], "item": q[:20], "result": res})
-            st.write(res)
+            with st.spinner("..."):
+                res = get_ai_response(q)
+                st.session_state.history.append({"type": T["menu_lab"], "item": q[:20], "result": res})
+                st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
-    # --- قسم عرض النتائج القديمة (السجل) ---
+    # --- السجل (History) ---
     st.divider()
     st.subheader(T["history"])
-    if not st.session_state.history:
-        st.write(T["no_history"])
+    if not st.session_state.history: st.write(T["no_history"])
     else:
         for entry in reversed(st.session_state.history):
             with st.expander(f"{entry['type']} - {entry['item']}"):
