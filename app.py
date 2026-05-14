@@ -48,30 +48,31 @@ def get_ai_response(prompt):
     
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # هذا الرابط هو المسار الصحيح والمحدث لتجنب خطأ 404 في v1beta
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # قائمة الروابط المحتملة (سنجربها واحداً تلو الآخر)
+    urls = [
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+        f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+    ]
     
     headers = {'Content-Type': 'application/json'}
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
-        
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            # قراءة رسالة الخطأ من السيرفر مباشرة لتحديد السبب بدقة
-            try:
-                error_info = response.json().get('error', {}).get('message', 'Unknown Error')
-            except:
-                error_info = response.text
-            return f"❌ خطأ ({response.status_code}): {error_info}"
-    except Exception as e:
-        return f"⚠️ فشل في الاتصال بالسيرفر: {str(e)}"
+    last_error = ""
+    for url in urls:
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            if response.status_code == 200:
+                # إذا نجح أحد الروابط، نعيد النتيجة فوراً ونكسر الحلقة
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            else:
+                last_error = f"خطأ ({response.status_code}): {response.text}"
+        except Exception as e:
+            last_error = str(e)
+            continue
+            
+    # إذا فشلت كل الروابط، نظهر آخر خطأ حدث
+    return f"❌ فشلت جميع محاولات الاتصال. آخر خطأ: {last_error}"
     api_key = st.secrets["GEMINI_API_KEY"]
     # استخدام الإصدار المستقر v1 لضمان أعلى توافق وتجنب خطأ 404
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
