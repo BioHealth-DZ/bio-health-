@@ -50,13 +50,12 @@ def get_ai_response(prompt):
     base_url = "https://generativelanguage.googleapis.com/v1beta"
     
     try:
-        # خطوة ذكية: سؤال السيرفر عن الموديلات المتاحة لهذا المفتاح تحديداً
-        models_resp = requests.get(f"{base_url}/models?key={api_key}")
+        # جلب قائمة الموديلات المتاحة
+        models_resp = requests.get(f"{base_url}/models?key={api_key}", timeout=10)
         if models_resp.status_code != 200:
-            return "❌ تعذر جلب قائمة الموديلات. تأكد من صحة الـ API Key."
+            return "❌ تعذر جلب قائمة الموديلات."
         
         available_models = models_resp.json().get('models', [])
-        # اختيار أول موديل يدعم توليد المحتوى (غالباً سيكون gemini-1.5-flash أو gemini-pro)
         target_model = None
         for m in available_models:
             if "generateContent" in m.get('supportedGenerationMethods', []):
@@ -64,21 +63,23 @@ def get_ai_response(prompt):
                 break
         
         if not target_model:
-            return "❌ لا يوجد موديل متاح لهذا المفتاح حالياً."
+            return "❌ لا يوجد موديل متاح."
 
-        # إرسال الطلب للموديل الذي وجده النظام تلقائياً
         url = f"{base_url}/{target_model}:generateContent?key={api_key}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         
-        response = requests.post(url, json=payload, timeout=15)
+        # التعديل هنا: تم زيادة timeout إلى 60 ثانية لحل مشكلة الأسئلة المخبرية الطويلة
+        response = requests.post(url, json=payload, timeout=60)
+        
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
             return f"❌ خطأ: {response.json().get('error', {}).get('message', 'Unknown error')}"
             
+    except requests.exceptions.Timeout:
+        return "⚠️ الإجابة استغرقت وقتاً طويلاً جداً، يرجى المحاولة مرة أخرى أو تبسيط السؤال."
     except Exception as e:
         return f"⚠️ عطل فني: {str(e)}"
-
 # 4. بيانات اللغات
 strings = {
     "العربية": {
