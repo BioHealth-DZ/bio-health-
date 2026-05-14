@@ -41,40 +41,45 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي - الحل الذي سيكسر الحلقة
+# 3. دالة الذكاء الاصطناعي - البحث التلقائي عن الموديل المتاح
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
-        return "⚠️ Error: API Key not found in Streamlit Secrets."
+        return "⚠️ Error: API Key not found."
     
     api_key = st.secrets["GEMINI_API_KEY"]
-    
-    # الرابط الوحيد الذي يعمل حالياً مع موديل Flash في نسخة v1beta
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    
-    headers = {'Content-Type': 'application/json'}
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    base_url = "https://generativelanguage.googleapis.com/v1beta"
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        # خطوة ذكية: سؤال السيرفر عن الموديلات المتاحة لهذا المفتاح تحديداً
+        models_resp = requests.get(f"{base_url}/models?key={api_key}")
+        if models_resp.status_code != 200:
+            return "❌ تعذر جلب قائمة الموديلات. تأكد من صحة الـ API Key."
         
-        # إذا كان الخطأ 404، سنجرب الموديل البديل فوراً في نفس اللحظة
-        if response.status_code == 404:
-            alt_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
-            response = requests.post(alt_url, json=payload, headers=headers, timeout=15)
+        available_models = models_resp.json().get('models', [])
+        # اختيار أول موديل يدعم توليد المحتوى (غالباً سيكون gemini-1.5-flash أو gemini-pro)
+        target_model = None
+        for m in available_models:
+            if "generateContent" in m.get('supportedGenerationMethods', []):
+                target_model = m['name']
+                break
+        
+        if not target_model:
+            return "❌ لا يوجد موديل متاح لهذا المفتاح حالياً."
 
+        # إرسال الطلب للموديل الذي وجده النظام تلقائياً
+        url = f"{base_url}/{target_model}:generateContent?key={api_key}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        
+        response = requests.post(url, json=payload, timeout=15)
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            err = response.json().get('error', {}).get('message', 'Unknown error')
-            return f"❌ تعذر الاتصال بالموديل: {err}"
+            return f"❌ خطأ: {response.json().get('error', {}).get('message', 'Unknown error')}"
+            
     except Exception as e:
-        return f"⚠️ خطأ فني: {str(e)}"
+        return f"⚠️ عطل فني: {str(e)}"
 
-# 4. بيانات اللغات (كما هي بدون تغيير)
+# 4. بيانات اللغات
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -94,7 +99,7 @@ strings = {
     }
 }
 
-# 5. منطق البرنامج (ثابت كما هو)
+# 5. منطق الدخول
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -117,7 +122,6 @@ else:
 
     nav1, nav2, nav3 = st.columns(3)
     if 'page' not in st.session_state: st.session_state.page = "bmi"
-    
     if nav1.button(T["menu_bmi"]): st.session_state.page = "bmi"
     if nav2.button(T["menu_food"]): st.session_state.page = "food"
     if nav3.button(T["menu_lab"]): st.session_state.page = "lab"
@@ -129,31 +133,30 @@ else:
         col1, col2, col3 = st.columns(3)
         with col1: age = st.number_input(T["age"], 1, 100, 25)
         with col2: gender = st.selectbox(T["gender"], [T["male"], T["female"]])
-        with col3: weight = st.number_input(T["w"]+" ⚖️", 30.0, 200.0, 70.0)
+        with col3: weight = st.number_input(T["w"], 30.0, 200.0, 70.0)
         col4, col5 = st.columns(2)
-        with col4: height = st.number_input(T["h"]+" 📏", 100.0, 250.0, 170.0)
+        with col4: height = st.number_input(T["h"], 100.0, 250.0, 170.0)
         with col5: chronic = st.multiselect(T["chronic"], [T["sugar"], T["press"], T["none"]])
         
         if st.button(T["btn"]):
             bmi = weight / ((height/100)**2)
             st.markdown(f"### BMI: **{bmi:.1f}**")
             with st.spinner("Analyzing..."):
-                prompt = f"Give health advice for {age} years old, {gender}, BMI {bmi:.1f}, conditions: {chronic}."
-                res = get_ai_response(prompt)
+                res = get_ai_response(f"Advice for {age}y {gender}, BMI {bmi:.1f}, {chronic}")
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "food":
         st.subheader(T["menu_food"])
-        food_query = st.text_input("إسم الطبق (مثلاً: كسكسي، شربة)")
-        if st.button("تحليل المكونات 🥗"):
-            with st.spinner("جاري التحليل..."):
-                res = get_ai_response(f"ما هي مكونات طبق {food_query}")
+        food_query = st.text_input("إسم الطبق")
+        if st.button("تحليل"):
+            with st.spinner("..."):
+                res = get_ai_response(f"تحليل طبق {food_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
 
     elif st.session_state.page == "lab":
         st.subheader(T["menu_lab"])
-        lab_query = st.text_area("سؤالك المخبري (مثلاً: Ziehl-Neelsen)")
-        if st.button("بحث طبي 🔬"):
-            with st.spinner("جاري البحث..."):
-                res = get_ai_response(f"اشرح بالتفصيل: {lab_query}")
+        lab_query = st.text_area("سؤالك المخبري")
+        if st.button("بحث"):
+            with st.spinner("..."):
+                res = get_ai_response(f"شرح مخبري لـ: {lab_query}")
                 st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
