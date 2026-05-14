@@ -6,7 +6,7 @@ import random
 # 1. إعداد الصفحة
 st.set_page_config(page_title="BioHealth DZ", page_icon="💊", layout="wide")
 
-# 2. التنسيق الجمالي (CSS) - إعادة الألوان والواجهة الاحترافية
+# 2. التنسيق الجمالي (CSS) - الحفاظ على التصميم الأصلي
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -41,54 +41,35 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. دالة الذكاء الاصطناعي (تجاوز خطأ الاتصال في الصورة)
+# 3. دالة الذكاء الاصطناعي - التصحيح الجذري للرابط (v1beta + gemini-1.5-flash-latest)
 def get_ai_response(prompt):
     if "GEMINI_API_KEY" not in st.secrets:
-        return "⚠️ مفتاح API غير موجود في إعدادات Secrets."
+        return "⚠️ Error: API Key not found in Streamlit Secrets."
     
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # قائمة الروابط المحتملة (سنجربها واحداً تلو الآخر)
-    urls = [
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
-        f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}",
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
-    ]
+    # استخدام الرابط المباشر للموديل الأحدث لتجنب 404 نهائياً
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
     
     headers = {'Content-Type': 'application/json'}
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    
-    last_error = ""
-    for url in urls:
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
-            if response.status_code == 200:
-                # إذا نجح أحد الروابط، نعيد النتيجة فوراً ونكسر الحلقة
-                return response.json()['candidates'][0]['content']['parts'][0]['text']
-            else:
-                last_error = f"خطأ ({response.status_code}): {response.text}"
-        except Exception as e:
-            last_error = str(e)
-            continue
-            
-    # إذا فشلت كل الروابط، نظهر آخر خطأ حدث
-    return f"❌ فشلت جميع محاولات الاتصال. آخر خطأ: {last_error}"
-    api_key = st.secrets["GEMINI_API_KEY"]
-    # استخدام الإصدار المستقر v1 لضمان أعلى توافق وتجنب خطأ 404
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
     
     try:
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        response = requests.post(url, json=payload, timeout=15)
-        
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
-            return f"❌ Connection Error ({response.status_code}). Please check your API Key status."
+            # إظهار رسالة الخطأ القادمة من السيرفر مباشرة
+            error_details = response.json().get('error', {}).get('message', 'Unknown Error')
+            return f"❌ السيرفر لا يستجيب حالياً ({response.status_code}): {error_details}"
     except Exception as e:
-        return f"⚠️ Connection failed: {str(e)}"
+        return f"⚠️ فشل الاتصال: {str(e)}"
 
-# 4. بيانات اللغات والنصائح المتغيرة
+# 4. بيانات اللغات والنصائح
 strings = {
     "العربية": {
         "welcome": "نظام BioHealth DZ الذكي 🏥", "enter": "دخول", "name": "الاسم الكامل",
@@ -108,7 +89,7 @@ strings = {
     }
 }
 
-# 5. منطق الدخول واختيار اللغة (الواجهة الأولى)
+# 5. منطق الدخول واختيار اللغة
 if 'logged' not in st.session_state: st.session_state.logged = False
 
 if not st.session_state.logged:
@@ -128,10 +109,8 @@ else:
     T = strings[st.session_state.lang]
     st.markdown(f'<div class="main-header"><h1>{T["welcome"]}</h1><p>مرحباً، {st.session_state.user} 👋</p></div>', unsafe_allow_html=True)
     
-    # النصيحة المتغيرة (تتغير عند كل دخول أو تحديث)
     st.markdown(f'<div class="tip-card">{random.choice(T["tips"])}</div>', unsafe_allow_html=True)
 
-    # أزرار التنقل بين الأقسام
     nav1, nav2, nav3 = st.columns(3)
     if 'page' not in st.session_state: st.session_state.page = "bmi"
     
@@ -141,7 +120,6 @@ else:
     
     st.divider()
 
-    # --- حاسبة الصحة ---
     if st.session_state.page == "bmi":
         st.subheader(T["menu_bmi"])
         col1, col2, col3 = st.columns(3)
@@ -157,6 +135,22 @@ else:
             bmi = weight / ((height/100)**2)
             st.markdown(f"### BMI: **{bmi:.1f}**")
             with st.spinner("Analyzing..."):
-                prompt = f"Provide health advice for a {age} years old {gender}, BMI: {bmi:.1f}, chronic: {chronic}."
+                prompt = f"Give health advice for {age} years old, {gender}, BMI {bmi:.1f}, conditions: {chronic}. Focus on nutrition."
                 res = get_ai_response(prompt)
                 st.markdown(f'<div class="advice-box"><b>{T["res"]}</b><br>{res}</div>', unsafe_allow_html=True)
+
+    elif st.session_state.page == "food":
+        st.subheader(T["menu_food"])
+        food_query = st.text_input("إسم الطبق (مثلاً: كسكسي، شربة)")
+        if st.button("تحليل المكونات 🥗"):
+            with st.spinner("جاري التحليل..."):
+                res = get_ai_response(f"ما هي المكونات والقيمة الغذائية التقريبية لطبق: {food_query}")
+                st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
+
+    elif st.session_state.page == "lab":
+        st.subheader(T["menu_lab"])
+        lab_query = st.text_area("أدخل سؤالك المخبري هنا (مثلاً: شرح تلوين Ziehl-Neelsen)")
+        if st.button("بحث طبي 🔬"):
+            with st.spinner("جاري البحث..."):
+                res = get_ai_response(f"بصفتك خبيراً مخبرياً، اشرح بالتفصيل: {lab_query}")
+                st.markdown(f'<div class="advice-box">{res}</div>', unsafe_allow_html=True)
